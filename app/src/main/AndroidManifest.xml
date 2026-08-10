@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!--
+         Foreground-service protection for long video exports (see
+         ExportForegroundService.kt). Without FOREGROUND_SERVICE +
+         FOREGROUND_SERVICE_DATA_SYNC, the OS is free to kill this app's
+         process the moment it's backgrounded mid-export — a very normal
+         thing for a user to do while waiting. POST_NOTIFICATIONS is only
+         needed so the progress notification is actually visible on API
+         33+; if denied, the foreground protection still applies, the
+         notification just won't show.
+
+         NOTE on the type choice: android:foregroundServiceType="dataSync"
+         is used here rather than "mediaProcessing" — mediaProcessing was
+         only added in Android 15 (API 35). This project compiles against
+         API 34, where that enum value doesn't exist yet and would fail
+         the build (aapt2 rejects unknown foregroundServiceType values).
+         dataSync is the correct, build-safe choice for "this app has
+         locally-generated data (a resized video) that needs finishing
+         work done on it" at this compileSdk level.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".VideoResizerApp"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VideoResizer"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.VideoResizer">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".ExportForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+    </application>
+
+</manifest>

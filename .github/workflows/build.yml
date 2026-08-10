@@ -1,0 +1,90 @@
+name: Build APK
+
+# COMPATIBILITY NOTE: this project's previous zip exports referenced this
+# workflow in README.md but never actually included .github/workflows/ nor
+# a working gradlew/gradlew.bat + gradle-wrapper.jar. That mismatch is the
+# most likely reason past pushes needed repeated troubleshooting: there was
+# no CI file for GitHub Actions to run at all. Rather than hand-crafting a
+# gradle-wrapper.jar (a binary file that has to match Gradle's own
+# checksums), this workflow uses the official gradle/actions/setup-gradle
+# action to install Gradle 8.7 directly (matching gradle/wrapper/gradle-wrapper.properties)
+# and invokes `gradle` instead of `./gradlew`. This needs no wrapper jar at
+# all and is fully reproducible from a clean checkout every time.
+#
+# REQUIRES a repository secret named RELEASE_KEYSTORE_PASSWORD (Settings >
+# Secrets and variables > Actions) matching the password release.keystore
+# was last rotated to. Without it, the release build step will still run
+# but produce an APK signed with a bogus fallback password that won't
+# match any previously-installed build.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build release APK
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: gradle assembleRelease --stacktrace
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          # BUG FIX: this used to always copy to a static "VideoResizer-release.apk"
+          # regardless of what version was actually built, so a downloaded artifact
+          # couldn't be told apart from any other version by its filename alone —
+          # versionName is read straight out of build.gradle.kts so this can never
+          # drift out of sync with the app's actual reported version.
+          VERSION_NAME=$(grep -m1 'versionName = ' app/build.gradle.kts | sed -E 's/.*versionName = "([^"]+)".*/\1/')
+          OUT_NAME="VideoResizer-v${VERSION_NAME}-release.apk"
+          echo "Versioned name: $OUT_NAME"
+          cp "$APK_PATH" "$OUT_NAME"
+          echo "apk_name=$OUT_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.apk_name }}
+          path: ${{ steps.apk.outputs.apk_name }}
+          if-no-files-found: error
+
+      # GitHub Release Rule: the signed APK must be published as an actual
+      # GitHub Release (visible in the repo's sidebar under "Releases"), not
+      # just an Actions artifact — artifacts require being logged into
+      # GitHub and navigating to a specific run, which isn't a good fit for
+      # installing on a phone straight from the repo homepage. Tag is the
+      # versionName read above, so every build gets its own release instead
+      # of overwriting a shared one.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.apk.outputs.version_name }}
+          name: v${{ steps.apk.outputs.version_name }}
+          files: ${{ steps.apk.outputs.apk_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
