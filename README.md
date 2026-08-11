@@ -555,3 +555,11 @@ the GitHub Actions route above is much faster in practice.
   ada blur asli (`RenderEffect`/API 31+) — efek kaca dicapai lewat
   transparansi + border tipis + gradasi latar, jadi tetap konsisten di
   semua versi Android yang didukung app (minSdk 24).
+- **Status build speed**: **Batch 4** (lihat `CHANGELOG.md`) mempercepat CI
+  (`assembleRelease` di GitHub Actions) lewat `gradle.properties` (heap
+  daemon lebih besar, `org.gradle.caching`, `-XX:+UseParallelGC`),
+  `lint.checkReleaseBuilds = false` di `app/build.gradle.kts`, dan flag
+  `--parallel --build-cache` eksplisit di `build.yml`. Bump versi
+  AGP/Kotlin dan `org.gradle.configuration-cache` sengaja belum disentuh —
+  keduanya butuh CI run nyata untuk diverifikasi, bukan cocok ditebak tanpa
+  compiler lokal (lihat alasan lengkap di `CHANGELOG.md`).

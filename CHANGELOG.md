@@ -1,5 +1,55 @@
 # Changelog
 
+## Unreleased — Batch 4: CI build-speed tuning
+
+Config-only batch — no app code touched, purely how fast `assembleRelease`
+runs in GitHub Actions (this project has no local Termux `gradle build`
+step in its own workflow — the Termux commands only `git commit`/`push` —
+so "compile time" here means CI time, tuned for GitHub's `ubuntu-latest`
+runners specifically).
+
+- **`gradle.properties`** — daemon heap 2048m → 4096m (`ubuntu-latest` has
+  ~7GB free, and the Compose compiler plugin is memory-hungry enough that
+  the old 2048m ceiling was likely forcing extra GC pauses mid-compile),
+  switched to `-XX:+UseParallelGC` (throughput-oriented, better fit for a
+  short-lived one-shot compile process than the default G1), and turned on
+  `org.gradle.caching` (Gradle's build cache — skips re-running tasks
+  entirely when their inputs haven't changed, which matters a lot for
+  *this* project's actual usage pattern: small daily-update batches where
+  most files are unchanged between pushes) and `org.gradle.parallel`
+  (limited win with only one Gradle module, `:app`, but free to leave on).
+- **`app/build.gradle.kts`** — `lint { checkReleaseBuilds = false }`.
+  `assembleRelease` otherwise drags AGP's lint-vital analysis pass in as a
+  dependency, which re-parses/re-analyzes the whole module every single
+  build; this CI job's only job is producing a signed, installable APK, not
+  gating on lint findings, so it's skipped rather than paid for on every
+  push.
+- **`.github/workflows/build.yml`** — `gradle assembleRelease` now passes
+  `--parallel --build-cache` explicitly, as a defense-in-depth belt-and-
+  suspenders alongside the `gradle.properties` flags (in case any future
+  edit to `gradle.properties` accidentally drops them, the CI command
+  itself still asks for both).
+
+**Deliberately not done, and why:**
+- **No AGP/Kotlin version bump.** Newer Kotlin/AGP releases do compile
+  faster, but changing them is a real compatibility risk (Compose compiler
+  extension version is pinned to a specific Kotlin version) that can't be
+  verified without an actual build — there's no `gradle`/`kotlinc` in this
+  environment to compile-check it first. Worth doing as its own batch, with
+  a real CI run to confirm it, not bundled sight-unseen into a "make it
+  faster" pass.
+- **No `org.gradle.configuration-cache=true`.** This is the other big lever
+  for repeat CI runs, but Gradle's configuration-cache entries live in a
+  *project-local* `.gradle/configuration-cache` folder, not the user-home
+  cache `gradle/actions/setup-gradle` already persists across runs — so it
+  would need its own `actions/cache` step to actually pay off, and some
+  third-party Gradle plugins still don't fully support it, which can turn
+  into an outright build failure rather than a slow one. Left off until it
+  can be tried and watched on a real run rather than guessed at here.
+- **`isMinifyEnabled` stays `false`.** Turning R8 shrinking *on* would make
+  the build slower, not faster, so it's untouched — it was already off, and
+  it stays off for this specific goal too.
+
 ## Unreleased — Batch 3 (Atomic): "Midnight Blue Glass" UI/UX overhaul
 
 Single atomic change — a full visual-identity overhaul can't be meaningfully

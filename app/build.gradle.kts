@@ -69,6 +69,15 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
+
+    // Build-speed tuning (see CHANGELOG.md, Batch 4): `assembleRelease`
+    // otherwise drags in AGP's lintVital analysis pass before it'll produce
+    // an APK, which re-parses/re-analyzes the whole module on every build.
+    // This CI's only job is producing an installable signed APK, not
+    // gating on lint findings, so skip it rather than pay for it every push.
+    lint {
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {
