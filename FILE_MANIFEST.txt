@@ -28,11 +28,11 @@ app/src/main/java/com/example/videoresizer/
   MainActivity.kt                          [PROTECTED — MainActivity] all 3 screens (Resizer/Studio/Batch), Compose UI, theme picker
   VideoResizerApp.kt                       [PROTECTED — Application] installs CrashLogger.install() in onCreate (Batch 2)
   CrashLogger.kt                           uncaught-exception handler → MediaStore Documents/VideoResizer/logs/, FIFO 50 (Batch 2)
-  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark overlay
+  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay (shared buildImageOverlay, Batch 8)
   ExportForegroundService.kt               foreground service wrapping VideoResizer for long exports
   FilmstripExtractor.kt                    thumbnail filmstrip generation for trim UI
   PublicMovieExporter.kt                   publishes finished videos to Movies/ via MediaStore (own-file insert, no legacy permission)
-  VideoHistoryStore.kt                     Studio screen's history persistence
+  VideoHistoryStore.kt                     Studio screen's history persistence (incl. caption fields, Batch 8)
   SocialPreset.kt                          social-media aspect ratio/bitrate presets (Instagram/TikTok/etc.)
 
 app/src/main/java/com/example/videoresizer/ui/theme/

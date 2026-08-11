@@ -25,12 +25,20 @@ android {
         // CI (e.g. Android Studio), so local builds still work with no env
         // var set.
         versionCode = System.getenv("VERSION_CODE_OVERRIDE")?.toIntOrNull() ?: 1013
-        // versionName stays a human-chosen semantic label, bumped
-        // deliberately per feature batch (see CHANGELOG.md) rather than
-        // auto-incrementing on every build — that's what versionCode above
-        // is for. .github/workflows/build.yml's "Locate APK" step reads
-        // this by grep as a plain string literal, so keep it one.
-        versionName = "1.13"
+        // The base semantic label, bumped manually per feature batch — this
+        // is the literal .github/workflows/build.yml's "Locate APK" step
+        // greps for, so keep this exact `val name = "..."` shape if it's
+        // ever touched again.
+        val semanticVersionName = "1.13"
+        // versionName itself is now fully dynamic too (Batch 8): appends
+        // "-build<n>" using the same VERSION_CODE_OVERRIDE env var
+        // versionCode reads above, so a device's Settings > App info shows
+        // exactly which CI run produced the installed APK — not just the
+        // human milestone label, which alone couldn't distinguish e.g. this
+        // batch's build from the previous one if both happened to land
+        // between semanticVersionName bumps. Falls back to the plain label
+        // with no suffix for any non-CI build (no env var set).
+        versionName = System.getenv("VERSION_CODE_OVERRIDE")?.let { "$semanticVersionName-build$it" } ?: semanticVersionName
     }
 
     // IMPORTANT: this keystore (release.keystore, committed at the project root)

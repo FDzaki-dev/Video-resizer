@@ -1,6 +1,10 @@
 package com.example.videoresizer
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -16,6 +20,7 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
 import com.google.common.collect.ImmutableList
 import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Target aspect ratio for the exported clip.
@@ -151,7 +156,11 @@ data class ResizeRequest(
     /** 0-100. How opaque the watermark is (100 = fully solid). */
     val watermarkOpacityPercent: Int = 70,
     /** 0-100. Watermark width as a rough percentage of the frame width. */
-    val watermarkScalePercent: Int = 18
+    val watermarkScalePercent: Int = 18,
+    /** Optional short caption burned into the output as a static text overlay (white text, black outline). Null/blank = no caption. */
+    val captionText: String? = null,
+    /** Reuses [WatermarkPosition] rather than a separate enum — same five anchor points work fine for a caption too. */
+    val captionPosition: WatermarkPosition = WatermarkPosition.BOTTOM_RIGHT
 )
 
 sealed class ResizeResult {
@@ -239,6 +248,19 @@ class VideoResizer(private val context: Context) {
             videoEffects.add(buildWatermarkOverlay(request, watermarkUri))
         }
 
+        // Caption overlay — reuses the exact same OverlayEffect/BitmapOverlay
+        // pipeline as the watermark above, just fed a bitmap this class
+        // renders itself (white text + black outline for legibility over any
+        // footage) instead of a picked image. Stacking this as its own
+        // OverlayEffect entry alongside the watermark one, rather than
+        // trying to merge them into a single overlay, mirrors how
+        // presentation/rotation/watermark already chain as independent
+        // Effect entries in this same list.
+        val captionText = request.captionText?.trim()
+        if (!captionText.isNullOrEmpty()) {
+            videoEffects.add(buildCaptionOverlay(request, captionText))
+        }
+
         var mediaItemBuilder = MediaItem.Builder().setUri(request.sourceUri)
         if (request.trimEndMs > request.trimStartMs) {
             mediaItemBuilder = mediaItemBuilder.setClippingConfiguration(
@@ -319,30 +341,29 @@ class VideoResizer(private val context: Context) {
     }
 
     /**
-     * Builds the [OverlayEffect] that draws [ResizeRequest.watermarkUri] on
-     * top of every output frame in a fixed corner, at a fixed opacity/scale,
-     * for the whole clip duration (a "static" overlay — position/opacity
-     * don't animate, matching what a novice user expects from a simple
-     * watermark toggle).
+     * Builds the [OverlayEffect] that draws a static image (a watermark, or
+     * a caption rendered to a bitmap by [buildCaptionOverlay]) on top of
+     * every output frame at a fixed corner/position, scale, and opacity for
+     * the whole clip duration.
      *
      * NDC anchor pairs below follow the pattern from Google's own Media3
      * Transformer sample code: `setOverlayFrameAnchor` picks a point *within
-     * the watermark image itself*, `setBackgroundFrameAnchor` picks the
-     * matching point on the video frame that the watermark's anchor point
-     * gets pinned to. A small inset (0.86 instead of 1.0) keeps the
-     * watermark from being flush against the very edge of the frame.
+     * the overlay image itself*, `setBackgroundFrameAnchor` picks the
+     * matching point on the video frame that the overlay's anchor point
+     * gets pinned to. A small inset (0.86 instead of 1.0) keeps the overlay
+     * from being flush against the very edge of the frame.
      */
-    private fun buildWatermarkOverlay(request: ResizeRequest, watermarkUri: Uri): OverlayEffect {
+    private fun buildImageOverlay(uri: Uri, position: WatermarkPosition, scalePercent: Int, opacityPercent: Int): OverlayEffect {
         val inset = 0.86f
-        val (overlayAnchorX, overlayAnchorY, bgAnchorX, bgAnchorY) = when (request.watermarkPosition) {
+        val (overlayAnchorX, overlayAnchorY, bgAnchorX, bgAnchorY) = when (position) {
             WatermarkPosition.TOP_LEFT -> Quad(-1f, 1f, -inset, inset)
             WatermarkPosition.TOP_RIGHT -> Quad(1f, 1f, inset, inset)
             WatermarkPosition.BOTTOM_LEFT -> Quad(-1f, -1f, -inset, -inset)
             WatermarkPosition.BOTTOM_RIGHT -> Quad(1f, -1f, inset, -inset)
             WatermarkPosition.CENTER -> Quad(0f, 0f, 0f, 0f)
         }
-        val scale = (request.watermarkScalePercent.coerceIn(5, 60)) / 100f
-        val alpha = (request.watermarkOpacityPercent.coerceIn(5, 100)) / 100f
+        val scale = (scalePercent.coerceIn(5, 60)) / 100f
+        val alpha = (opacityPercent.coerceIn(5, 100)) / 100f
 
         val overlaySettings = OverlaySettings.Builder()
             .setOverlayFrameAnchor(overlayAnchorX, overlayAnchorY)
@@ -351,8 +372,57 @@ class VideoResizer(private val context: Context) {
             .setAlphaScale(alpha)
             .build()
 
-        val overlay = BitmapOverlay.createStaticBitmapOverlay(context, watermarkUri, overlaySettings)
+        val overlay = BitmapOverlay.createStaticBitmapOverlay(context, uri, overlaySettings)
         return OverlayEffect(ImmutableList.of(overlay))
+    }
+
+    private fun buildWatermarkOverlay(request: ResizeRequest, watermarkUri: Uri): OverlayEffect =
+        buildImageOverlay(watermarkUri, request.watermarkPosition, request.watermarkScalePercent, request.watermarkOpacityPercent)
+
+    /**
+     * Renders [text] to a small transparent-background PNG in the app's
+     * cache dir, then hands it to [buildImageOverlay] exactly like a picked
+     * watermark image — reusing the same already-working overlay pipeline
+     * rather than a separate Media3 text-rendering API. Fixed white-text/
+     * black-outline style (readable over both light and dark footage) and a
+     * fixed 40% frame-width scale, matching how the watermark feature
+     * itself started as a simple on/off toggle before scale/opacity
+     * sliders were added — a caption can grow the same way later if it
+     * turns out to need per-caption sizing.
+     */
+    private fun buildCaptionOverlay(request: ResizeRequest, text: String): OverlayEffect {
+        val bitmap = renderCaptionBitmap(text)
+        val file = File(context.cacheDir, "caption_overlay_${System.currentTimeMillis()}.png")
+        FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+        bitmap.recycle()
+        val captionUri = Uri.fromFile(file)
+        return buildImageOverlay(captionUri, request.captionPosition, scalePercent = 40, opacityPercent = 100)
+    }
+
+    private fun renderCaptionBitmap(text: String): Bitmap {
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 64f
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.LEFT
+        }
+        val strokePaint = Paint(fillPaint).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
+            color = android.graphics.Color.BLACK
+        }
+        val padding = 24f
+        val textWidth = fillPaint.measureText(text)
+        val fm = fillPaint.fontMetrics
+        val textHeight = fm.descent - fm.ascent
+        val bmpWidth = (textWidth + padding * 2).toInt().coerceAtLeast(1)
+        val bmpHeight = (textHeight + padding * 2).toInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(bmpWidth, bmpHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val baseline = padding - fm.ascent
+        canvas.drawText(text, padding, baseline, strokePaint)
+        canvas.drawText(text, padding, baseline, fillPaint)
+        return bitmap
     }
 
     /** Small tuple purely to keep [buildWatermarkOverlay]'s anchor math on one readable line each. */

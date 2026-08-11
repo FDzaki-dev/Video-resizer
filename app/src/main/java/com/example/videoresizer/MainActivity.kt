@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.BrandingWatermark
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -169,7 +170,9 @@ private data class PrefillSettings(
     val watermarkUri: Uri?,
     val watermarkPosition: WatermarkPosition,
     val watermarkOpacityPercent: Int,
-    val watermarkScalePercent: Int
+    val watermarkScalePercent: Int,
+    val captionText: String?,
+    val captionPosition: WatermarkPosition
 )
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -234,7 +237,9 @@ private fun VideoResizerApp(
                         watermarkUri = entry.watermarkUri?.let { Uri.parse(it) },
                         watermarkPosition = WatermarkPosition.ENTRIES.firstOrNull { it.name == entry.watermarkPositionName } ?: WatermarkPosition.BOTTOM_RIGHT,
                         watermarkOpacityPercent = entry.watermarkOpacityPercent,
-                        watermarkScalePercent = entry.watermarkScalePercent
+                        watermarkScalePercent = entry.watermarkScalePercent,
+                        captionText = entry.captionText,
+                        captionPosition = WatermarkPosition.ENTRIES.firstOrNull { it.name == entry.captionPositionName } ?: WatermarkPosition.BOTTOM_RIGHT
                     )
                     screen = Screen.MAIN
                 },
@@ -329,6 +334,11 @@ private fun ResizerScreen(
     var watermarkPosition by remember { mutableStateOf(WatermarkPosition.BOTTOM_RIGHT) }
     var watermarkOpacityPercent by remember { mutableFloatStateOf(70f) }
     var watermarkScalePercent by remember { mutableFloatStateOf(18f) }
+    // Caption overlay — short burned-in text, same fixed-position idea as
+    // the watermark above but rendered from typed text instead of a picked
+    // image. captionText blank = no caption.
+    var captionText by remember { mutableStateOf("") }
+    var captionPosition by remember { mutableStateOf(WatermarkPosition.BOTTOM_RIGHT) }
     // One-tap "export for TikTok/IG/YouTube" preset. Selecting one just sets
     // aspect/resolution/quality to matching values below — it's a shortcut,
     // not a separate code path, so it stays in sync with manual overrides:
@@ -425,6 +435,8 @@ private fun ResizerScreen(
                 watermarkPosition = p.watermarkPosition
                 watermarkOpacityPercent = p.watermarkOpacityPercent.toFloat()
                 watermarkScalePercent = p.watermarkScalePercent.toFloat()
+                captionText = p.captionText ?: ""
+                captionPosition = p.captionPosition
                 selectedSocialPreset = null
                 trimRange = (p.trimStartMs.toFloat() / d).coerceIn(0f, 1f)..(p.trimEndMs.toFloat() / d).coerceIn(0f, 1f)
                 resultMessage = null
@@ -1047,6 +1059,52 @@ private fun ResizerScreen(
                     }
                 }
 
+                // Caption overlay — short burned-in text (white + black
+                // outline, fixed style/size), positioned with the same
+                // WatermarkPosition picker the watermark section above uses.
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.ClosedCaption,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Caption", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                    }
+                    OutlinedTextField(
+                        value = captionText,
+                        onValueChange = { captionText = it },
+                        placeholder = { Text("Tulis caption singkat…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (captionText.isNotBlank()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(WatermarkPosition.ENTRIES) { pos ->
+                                FilterChip(
+                                    selected = pos == captionPosition,
+                                    onClick = { captionPosition = pos },
+                                    label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            "Opsional: teks singkat yang ikut ter-render permanen di video hasil resize.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 OptionSection(
                     title = "Rotasi",
                     options = RotationOption.ENTRIES,
@@ -1157,7 +1215,9 @@ private fun ResizerScreen(
                                 watermarkUri = watermarkUri,
                                 watermarkPosition = watermarkPosition,
                                 watermarkOpacityPercent = watermarkOpacityPercent.roundToInt(),
-                                watermarkScalePercent = watermarkScalePercent.roundToInt()
+                                watermarkScalePercent = watermarkScalePercent.roundToInt(),
+                                captionText = captionText,
+                                captionPosition = captionPosition
                             )
                             // Before/after comparison: this same thumbnail file is
                             // already generated for Studio history once export
@@ -1339,6 +1399,13 @@ private fun BatchScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var items by remember { mutableStateOf<List<BatchItem>>(emptyList()) }
+    // Per-item preview thumbnail, keyed by Uri rather than added as a field
+    // on BatchItem itself — BatchItem is a plain data class copied a lot
+    // (status updates during processing), and a Bitmap field would mean
+    // re-copying/re-comparing a Bitmap on every single one of those status
+    // updates for no reason. A side map keyed by Uri stays populated across
+    // those copies with zero extra cost.
+    var thumbnails by remember { mutableStateOf<Map<Uri, Bitmap>>(emptyMap()) }
     var isProcessing by remember { mutableStateOf(false) }
     var currentIndex by remember { mutableIntStateOf(-1) }
     var activeTransformer by remember { mutableStateOf<androidx.media3.transformer.Transformer?>(null) }
@@ -1366,6 +1433,8 @@ private fun BatchScreen(onBack: () -> Unit) {
     var watermarkPosition by remember { mutableStateOf(WatermarkPosition.BOTTOM_RIGHT) }
     var watermarkOpacityPercent by remember { mutableFloatStateOf(70f) }
     var watermarkScalePercent by remember { mutableFloatStateOf(18f) }
+    var captionText by remember { mutableStateOf("") }
+    var captionPosition by remember { mutableStateOf(WatermarkPosition.BOTTOM_RIGHT) }
     var selectedSocialPreset by remember { mutableStateOf<SocialPreset?>(null) }
 
     // Shared with ResizerScreen via the same SharedPreferences key, so the
@@ -1386,7 +1455,28 @@ private fun BatchScreen(onBack: () -> Unit) {
                 }
                 BatchItem(uri = uri, displayName = queryDisplayName(context, uri))
             }
+            thumbnails = emptyMap()
             summaryMessage = null
+        }
+    }
+
+    // Per-item preview thumbnail for the queue list below. count=1 makes
+    // FilmstripExtractor grab a single frame at time 0 regardless of the
+    // durationMs argument (see its fraction-for-count==1 branch), so a
+    // real duration isn't needed here — the dummy 1L is never actually
+    // used by that code path. Skips any Uri already in the map so picking
+    // more videos on top of an existing queue doesn't re-decode ones
+    // already thumbnailed.
+    LaunchedEffect(items) {
+        val missing = items.map { it.uri }.filter { it !in thumbnails }
+        if (missing.isEmpty()) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            for (uri in missing) {
+                val frame = FilmstripExtractor.extract(context, uri, durationMs = 1L, count = 1, targetHeightPx = 96).firstOrNull()
+                if (frame != null) {
+                    thumbnails = thumbnails + (uri to frame)
+                }
+            }
         }
     }
 
@@ -1494,7 +1584,9 @@ private fun BatchScreen(onBack: () -> Unit) {
                     watermarkUri = watermarkUri,
                     watermarkPosition = watermarkPosition,
                     watermarkOpacityPercent = watermarkOpacityPercent.roundToInt(),
-                    watermarkScalePercent = watermarkScalePercent.roundToInt()
+                    watermarkScalePercent = watermarkScalePercent.roundToInt(),
+                    captionText = captionText,
+                    captionPosition = captionPosition
                 )
                 val thumbnailFile = File(thumbDir, "thumb_$id.jpg")
 
@@ -1621,13 +1713,40 @@ private fun BatchScreen(onBack: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                item.displayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                maxLines = 1,
-                                modifier = Modifier.weight(1f)
-                            )
+                            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                val thumb = thumbnails[item.uri]
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (thumb != null) {
+                                        Image(
+                                            bitmap = thumb.asImageBitmap(),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Filled.Movie,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    item.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(8.dp))
                             val statusText = when (val s = item.status) {
                                 is BatchStatus.Waiting -> if (isProcessing) "Menunggu" else ""
@@ -1820,6 +1939,28 @@ private fun BatchScreen(onBack: () -> Unit) {
                             FilterChip(
                                 selected = pos == watermarkPosition,
                                 onClick = { watermarkPosition = pos },
+                                label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Caption", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                OutlinedTextField(
+                    value = captionText,
+                    onValueChange = { captionText = it },
+                    placeholder = { Text("Tulis caption singkat…") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (captionText.isNotBlank()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(WatermarkPosition.ENTRIES) { pos ->
+                            FilterChip(
+                                selected = pos == captionPosition,
+                                onClick = { captionPosition = pos },
                                 label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) }
                             )
                         }
@@ -2799,7 +2940,9 @@ private fun runResize(
                                             watermarkUri = request.watermarkUri?.toString(),
                                             watermarkPositionName = request.watermarkPosition.name,
                                             watermarkOpacityPercent = request.watermarkOpacityPercent,
-                                            watermarkScalePercent = request.watermarkScalePercent
+                                            watermarkScalePercent = request.watermarkScalePercent,
+                                            captionText = request.captionText,
+                                            captionPositionName = request.captionPosition.name
                                         )
                                     )
                                 }

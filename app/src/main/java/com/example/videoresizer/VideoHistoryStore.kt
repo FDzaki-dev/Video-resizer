@@ -46,7 +46,10 @@ data class VideoHistoryEntry(
     val watermarkUri: String? = null,
     val watermarkPositionName: String = WatermarkPosition.BOTTOM_RIGHT.name,
     val watermarkOpacityPercent: Int = 70,
-    val watermarkScalePercent: Int = 18
+    val watermarkScalePercent: Int = 18,
+    /** Caption text used for this export, if any. Null/blank for entries saved before this field existed. */
+    val captionText: String? = null,
+    val captionPositionName: String = WatermarkPosition.BOTTOM_RIGHT.name
 )
 
 /**
@@ -123,6 +126,8 @@ object VideoHistoryStore {
         put("watermarkPositionName", entry.watermarkPositionName)
         put("watermarkOpacityPercent", entry.watermarkOpacityPercent)
         put("watermarkScalePercent", entry.watermarkScalePercent)
+        put("captionText", entry.captionText)
+        put("captionPositionName", entry.captionPositionName)
     }
 
     private fun fromJson(obj: JSONObject): VideoHistoryEntry? = runCatching {
@@ -151,7 +156,9 @@ object VideoHistoryStore {
             watermarkUri = obj.optString("watermarkUri", "").ifEmpty { null },
             watermarkPositionName = obj.optString("watermarkPositionName", WatermarkPosition.BOTTOM_RIGHT.name),
             watermarkOpacityPercent = if (obj.has("watermarkOpacityPercent")) obj.optInt("watermarkOpacityPercent", 70) else 70,
-            watermarkScalePercent = if (obj.has("watermarkScalePercent")) obj.optInt("watermarkScalePercent", 18) else 18
+            watermarkScalePercent = if (obj.has("watermarkScalePercent")) obj.optInt("watermarkScalePercent", 18) else 18,
+            captionText = obj.optString("captionText", "").ifEmpty { null },
+            captionPositionName = obj.optString("captionPositionName", WatermarkPosition.BOTTOM_RIGHT.name)
         )
     }.getOrNull()
 }

@@ -1,5 +1,58 @@
 # Changelog
 
+## Unreleased — Batch 8: Finish everything left pending (caption overlay, batch thumbnails, dynamic versionName)
+
+Closes out every item that had been left as a "not done yet" note across
+Batches 1–7, in one pass, instead of leaving them scattered:
+
+- **New: text caption overlay** (`VideoResizer.kt`) — a short line of text
+  burned into the exported video as a static overlay (white fill + black
+  outline for legibility over any footage), reusing the exact same
+  `OverlayEffect`/`BitmapOverlay` pipeline the watermark feature already
+  uses: `buildWatermarkOverlay` is now a thin wrapper around a new shared
+  `buildImageOverlay(uri, position, scale, opacity)`, and captions render
+  their text to a PNG in the app's cache dir via a plain `Canvas`/`Paint`
+  (`renderCaptionBitmap`) and feed that file's `Uri` through the same
+  helper — so this adds zero new Media3 API surface, only reusing an
+  already-working path. `ResizeRequest` gained `captionText`/
+  `captionPosition` (the latter reuses `WatermarkPosition` rather than a
+  new enum — same five anchor points apply). UI: both `ResizerScreen` and
+  `BatchScreen` gained a "Caption" text field + position chips, directly
+  below their existing watermark section. Fixed style/scale only (no
+  color/size picker) for this first pass — same scope level the watermark
+  feature itself started at before scale/opacity sliders were added later.
+- **New: per-item thumbnail preview in the Batch Export queue**
+  (`MainActivity.kt`'s `BatchScreen`) — each queued video now shows a small
+  40dp preview next to its filename instead of just text. Reuses
+  `FilmstripExtractor.extract(..., count = 1)` (already used for the trim
+  scrubber) to grab a single frame per video on `Dispatchers.IO`, cached in
+  a `Map<Uri, Bitmap>` keyed by Uri so re-picking more videos on top of an
+  existing queue doesn't re-decode already-thumbnailed ones.
+- **Studio history now remembers captions too** (`VideoHistoryStore.kt` +
+  `MainActivity.kt`'s `PrefillSettings`) — `captionText`/
+  `captionPositionName` added to `VideoHistoryEntry` (with safe
+  `optString` fallbacks so older saved entries without these fields still
+  load), and wired through "Edit ulang" the same way watermark settings
+  already were, so re-opening a past export for editing doesn't silently
+  drop its caption.
+- **`versionName` is now dynamic too** (`app/build.gradle.kts` +
+  `.github/workflows/build.yml`) — Batch 7 only made `versionCode`
+  dynamic and deliberately left `versionName` as a static human label;
+  revisited per this batch's "finish everything" scope. `versionName` now
+  appends `-build<n>` using the same `VERSION_CODE_OVERRIDE` env var
+  `versionCode` already reads, so a device's Settings > App info shows
+  exactly which CI run produced the installed APK. The base label moved
+  into a `val semanticVersionName = "1.13"` literal (still bumped
+  manually per feature batch) so there's still exactly one clear place to
+  change it, and `.github/workflows/build.yml`'s "Locate APK" step now
+  greps that instead of the old (now-gone) plain `versionName = "..."`
+  literal.
+
+**Not respun in this batch, and why:** the already-duplicated `v1.13`
+GitHub Release from before Batch 5's fix — that's a one-time manual
+cleanup on the person's end (`gh release delete v1.13 -y` in Termux), not
+something any code change here can reach back and undo.
+
 ## Unreleased — Batch 7: Dynamic versionCode
 
 - **`app/build.gradle.kts`** — `versionCode` was a flat hand-maintained

@@ -507,11 +507,12 @@ the GitHub Actions route above is much faster in practice.
   moving to the next), so it inherits that pipeline's existing correctness rather than
   introducing a new export code path.
 - With batch export in, the feature set from the original three options
-  (bitrate/quality, batch export, watermark/logo) is complete. Two things that were
-  never on that original list but would be natural next steps if wanted: **text
-  caption overlay** (a second `OverlayEffect`/`TextOverlay`-style layer alongside the
-  image watermark) and **per-batch-item preview thumbnails** in the queue list (currently
-  just filenames, to keep the picker step light for large batches).
+  (bitrate/quality, batch export, watermark/logo) is complete. Two more
+  things that were natural next steps beyond that original list — **text
+  caption overlay** and **per-batch-item preview thumbnails** in the queue
+  list — were built in Batch 8 (see `CHANGELOG.md`), reusing the
+  watermark's overlay pipeline and the trim scrubber's frame extractor
+  respectively rather than adding new subsystems for either.
 
 ## Project & CI notes (baca ini dulu sebelum ubah setup build/git)
 
