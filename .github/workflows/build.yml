@@ -59,11 +59,25 @@ jobs:
           # versionName is read straight out of build.gradle.kts so this can never
           # drift out of sync with the app's actual reported version.
           VERSION_NAME=$(grep -m1 'versionName = ' app/build.gradle.kts | sed -E 's/.*versionName = "([^"]+)".*/\1/')
-          OUT_NAME="VideoResizer-v${VERSION_NAME}-release.apk"
+          # BUG FIX: every push used to tag/release as plain "v${VERSION_NAME}".
+          # Since versionName in app/build.gradle.kts isn't bumped on every
+          # single push (it's a deliberate per-feature-batch bump, not a
+          # per-commit one), two different pushes with the same versionName
+          # produced the SAME tag — which made softprops/action-gh-release
+          # edit the existing release in place (duplicated "Full Changelog"
+          # sections, silently replaced APK asset) instead of creating a new
+          # one, so there was no way to tell which build was actually running
+          # on a device or download a specific earlier one. The run number is
+          # a GitHub-guaranteed strictly-increasing counter per workflow, so
+          # appending it makes every tag/filename unique even when
+          # versionName is unchanged across several pushes in a row.
+          RELEASE_TAG="v${VERSION_NAME}-build${GITHUB_RUN_NUMBER}"
+          OUT_NAME="VideoResizer-v${VERSION_NAME}-build${GITHUB_RUN_NUMBER}-release.apk"
           echo "Versioned name: $OUT_NAME"
           cp "$APK_PATH" "$OUT_NAME"
           echo "apk_name=$OUT_NAME" >> "$GITHUB_OUTPUT"
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -76,14 +90,15 @@ jobs:
       # GitHub Release (visible in the repo's sidebar under "Releases"), not
       # just an Actions artifact — artifacts require being logged into
       # GitHub and navigating to a specific run, which isn't a good fit for
-      # installing on a phone straight from the repo homepage. Tag is the
-      # versionName read above, so every build gets its own release instead
-      # of overwriting a shared one.
+      # installing on a phone straight from the repo homepage. Tag comes
+      # from steps.apk.outputs.release_tag (versionName + run number, see
+      # the BUG FIX comment above), so every run gets its own release
+      # instead of colliding with and overwriting a previous one.
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.apk.outputs.version_name }}
-          name: v${{ steps.apk.outputs.version_name }}
+          tag_name: ${{ steps.apk.outputs.release_tag }}
+          name: ${{ steps.apk.outputs.release_tag }}
           files: ${{ steps.apk.outputs.apk_name }}
           generate_release_notes: true
         env:

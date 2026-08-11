@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Batch 5: Fix duplicate/colliding GitHub Releases
+
+- **`.github/workflows/build.yml`** — release tag and APK filename were
+  built from `versionName` alone (`v${VERSION_NAME}`). `versionName` is
+  bumped per feature batch, not per push, so several pushes in a row with
+  no `app/build.gradle.kts` version bump (exactly what Batches 3 and 4
+  were) produced the **same tag**. `softprops/action-gh-release` treats a
+  repeat tag as "edit this release", not "make a new one" — hence the
+  duplicated "Full Changelog" section and same-named APK asset just getting
+  silently replaced each run, seen in the repo's Releases page. Fixed by
+  appending `${GITHUB_RUN_NUMBER}` (a GitHub-guaranteed strictly-increasing
+  per-workflow counter) to both the tag and the APK filename — e.g.
+  `v1.13-build17`, `VideoResizer-v1.13-build17-release.apk` — so every CI
+  run now always produces its own release and its own uniquely-named APK,
+  even when versionName hasn't changed.
+
+**Not done / out of scope for this fix:** deleting the already-duplicated
+`v1.13` release on GitHub itself — that's a one-time manual cleanup on the
+repo's Releases page (or `gh release delete v1.13`), not something a code
+change here can retroactively undo.
+
 ## Unreleased — Batch 4: CI build-speed tuning
 
 Config-only batch — no app code touched, purely how fast `assembleRelease`
