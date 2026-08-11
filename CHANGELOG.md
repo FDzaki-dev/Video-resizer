@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Batch 6: Add missing PROJECT_STATE.md / FILE_MANIFEST.txt
+
+Housekeeping — no app code or CI touched. The context hierarchy in user
+preferences (Chat Saat Ini > PROJECT_STATE.md > FILE_MANIFEST.txt >
+CHANGELOG.md > README.md) has required these two files from the start;
+Batches 1–5 only ever used CHANGELOG.md/README.md, so this fills the gap.
+
+- **New: `FILE_MANIFEST.txt`** — every file in the project, one line each,
+  with its purpose and whether it's `[PROTECTED]` (edit-parsial-only per
+  user preferences).
+- **New: `PROJECT_STATE.md`** — current-state snapshot: version, batch
+  history summary, defaults a new reader needs to know (default theme,
+  minifyEnabled=false, crash-log location, CI release-tag format), pending
+  items, and this sandbox's own constraints (no local compiler).
+
+**Going forward**: both files get updated at the end of every batch instead
+of drifting stale — PROJECT_STATE.md's "Batch history" section and
+FILE_MANIFEST.txt's file list in particular.
+
 ## Unreleased — Batch 5: Fix duplicate/colliding GitHub Releases
 
 - **`.github/workflows/build.yml`** — release tag and APK filename were

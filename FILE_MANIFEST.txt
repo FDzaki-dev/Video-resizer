@@ -1,0 +1,54 @@
+FILE_MANIFEST.txt — Video Resizer
+Generated: Batch 6. Regenerate/update this file whenever files are added,
+removed, or renamed — it should always match `find . -type f` for real.
+Legend: [PROTECTED] = edit-parsial-only per user preferences; deleting or
+rewriting wholesale requires explicit user permission first.
+
+ROOT
+  build.gradle.kts                         [PROTECTED] root Gradle plugin versions (AGP 8.4.0, Kotlin 1.9.24)
+  settings.gradle.kts                      [PROTECTED] module list, repositories
+  gradle.properties                        [PROTECTED] daemon/JVM + build-speed flags (Batch 4)
+  gradle/wrapper/gradle-wrapper.properties [PROTECTED] Gradle 8.7 — matches .github/workflows/build.yml
+  release.keystore                         [PROTECTED] signing keystore — NEVER delete/regenerate/gitignore
+  .gitignore                               [PROTECTED]
+  .github/workflows/build.yml              [PROTECTED] CI: assembleRelease + publish GitHub Release (Batch 5: unique tag/APK per run)
+  README.md                                context: architecture notes, known quirks, operational status
+  CHANGELOG.md                             context: full batch-by-batch history
+  PROJECT_STATE.md                         context: current state snapshot (this batch's companion file)
+  FILE_MANIFEST.txt                        this file
+
+app/
+  build.gradle.kts                         [PROTECTED] app module: deps, signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false
+  proguard-rules.pro                       R8 rules (inactive while isMinifyEnabled=false)
+
+app/src/main/
+  AndroidManifest.xml                      [PROTECTED] android:name=".VideoResizerApp" (Batch 2), permissions, activity decl
+
+app/src/main/java/com/example/videoresizer/
+  MainActivity.kt                          [PROTECTED — MainActivity] all 3 screens (Resizer/Studio/Batch), Compose UI, theme picker
+  VideoResizerApp.kt                       [PROTECTED — Application] installs CrashLogger.install() in onCreate (Batch 2)
+  CrashLogger.kt                           uncaught-exception handler → MediaStore Documents/VideoResizer/logs/, FIFO 50 (Batch 2)
+  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark overlay
+  ExportForegroundService.kt               foreground service wrapping VideoResizer for long exports
+  FilmstripExtractor.kt                    thumbnail filmstrip generation for trim UI
+  PublicMovieExporter.kt                   publishes finished videos to Movies/ via MediaStore (own-file insert, no legacy permission)
+  VideoHistoryStore.kt                     Studio screen's history persistence
+  SocialPreset.kt                          social-media aspect ratio/bitrate presets (Instagram/TikTok/etc.)
+
+app/src/main/java/com/example/videoresizer/ui/theme/
+  Color.kt                                 all palettes: Dark/Light/Neon/Paper/Glass (Batch 3) + MidnightBlueGlassGradient Brush
+  Theme.kt                                 AppThemeStyle enum, VideoResizerTheme(), LocalIsGlassTheme (Batch 3)
+  Type.kt                                  Typography per theme, incl. GlassTypography (Batch 3)
+
+app/src/main/res/
+  values/colors.xml, strings.xml, themes.xml    standard Android resources
+  values-night/themes.xml                       dark-mode system theme resource
+  drawable/ic_launcher*.xml                      launcher icon (vector)
+  mipmap-anydpi-v26/ic_launcher.xml              adaptive icon wrapper
+  xml/backup_rules.xml, data_extraction_rules.xml, file_paths.xml   backup/FileProvider config
+
+NOT PRESENT (do not assume these exist)
+  No gradlew / gradlew.bat / gradle-wrapper.jar — CI installs Gradle 8.7
+  directly via gradle/actions/setup-gradle instead (see build.yml's
+  COMPATIBILITY NOTE comment). Termux workflow never runs `./gradlew`
+  either, only git commands — see README.md's Termux section.
