@@ -11,7 +11,25 @@ android {
         applicationId = "com.example.videoresizer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 13
+        // versionCode is dynamic (Batch 7): every CI build gets its own
+        // code by reading VERSION_CODE_OVERRIDE (set from $GITHUB_RUN_NUMBER
+        // in .github/workflows/build.yml) instead of a hand-maintained
+        // integer that only changed when someone remembered to bump it —
+        // which is why it sat at 13 across Batches 1-6 even though the app
+        // itself changed every batch. Offset by 1000 so this can never dip
+        // below the old manually-set value regardless of exactly how many
+        // times the workflow has run: Android refuses to install an APK as
+        // an "update" over one with a higher versionCode already on the
+        // device, so this must never go backward. Falls back to 1013
+        // (1000 + the old versionCode 13) for any build not running in this
+        // CI (e.g. Android Studio), so local builds still work with no env
+        // var set.
+        versionCode = System.getenv("VERSION_CODE_OVERRIDE")?.toIntOrNull() ?: 1013
+        // versionName stays a human-chosen semantic label, bumped
+        // deliberately per feature batch (see CHANGELOG.md) rather than
+        // auto-incrementing on every build — that's what versionCode above
+        // is for. .github/workflows/build.yml's "Locate APK" step reads
+        // this by grep as a plain string literal, so keep it one.
         versionName = "1.13"
     }
 

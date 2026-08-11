@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Batch 7: Dynamic versionCode
+
+- **`app/build.gradle.kts`** — `versionCode` was a flat hand-maintained
+  integer (`13`) that sat unchanged across Batches 1–6 even though the app
+  itself changed every batch, because nobody's job in this workflow was to
+  remember to bump it. Now reads `VERSION_CODE_OVERRIDE` from the
+  environment, offset by a fixed `1000` so it can never dip below the old
+  value regardless of exact run count (Android refuses to install an APK
+  as an "update" over a higher versionCode already on the device — going
+  backward would force a manual uninstall). Falls back to `1013` for any
+  build that isn't running in this CI (e.g. Android Studio).
+- **`.github/workflows/build.yml`** — `Build release APK` step now sets
+  `VERSION_CODE_OVERRIDE: ${{ github.run_number }}`, the same run number
+  already used for the release tag/APK filename since Batch 5 — so a given
+  CI run's versionCode, release tag, and APK filename all derive from one
+  consistent number instead of three separately-tracked ones.
+- **`versionName` stays manual on purpose** — it's the human-chosen
+  semantic label ("1.13"), bumped deliberately per feature batch, not per
+  build. Auto-incrementing it too would mean every CI run reports a
+  different marketing version even for a pure CI-config batch like this
+  one, which isn't what semantic versioning is for. `versionCode` is what
+  actually needed to be dynamic (it's what Android and this workflow's own
+  tag/filename logic depend on), so that's the one batch this touches.
+
 ## Unreleased — Batch 6: Add missing PROJECT_STATE.md / FILE_MANIFEST.txt
 
 Housekeeping — no app code or CI touched. The context hierarchy in user

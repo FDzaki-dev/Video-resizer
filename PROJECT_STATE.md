@@ -7,14 +7,21 @@ stale. Full detail for anything summarized here lives in CHANGELOG.md;
 architecture/quirk notes live in README.md.
 
 ## Current version
-- `versionName` "1.13" / `versionCode` 13 (unchanged since before Batch 1 —
-  none of Batches 1–5 bumped it, since none were user-facing feature
-  changes to the resize/export pipeline itself. Bump it whenever a batch
-  changes what the app actually *does*, not for CI/theming/housekeeping.)
+- `versionName` "1.13" (human/semantic, manual — unchanged since before
+  Batch 1; none of Batches 1–6 were user-facing feature changes to the
+  resize/export pipeline itself. Bump it whenever a batch changes what the
+  app actually *does*.)
+- `versionCode` **dynamic since Batch 7**: `1000 + $GITHUB_RUN_NUMBER` in
+  CI, falls back to `1013` for any non-CI build.
 - Package: `com.example.videoresizer`, minSdk 24, targetSdk/compileSdk 34
 - AGP 8.4.0, Kotlin 1.9.24, Gradle 8.7 (no wrapper jar — see FILE_MANIFEST.txt)
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 7** — `versionCode` is now dynamic: `1000 + $GITHUB_RUN_NUMBER`
+  (was a static `13` since before Batch 1). `versionName` stays manual/
+  semantic on purpose — see CHANGELOG.md for why.
+- **Batch 6** — Added this file and FILE_MANIFEST.txt (were missing since
+  Batch 1 despite being required by the context hierarchy).
 - **Batch 5** — Fixed GitHub Release tag/APK-name collisions: tag now
   includes `$GITHUB_RUN_NUMBER` so repeat pushes without a versionName
   bump stop overwriting/duplicating the same release.

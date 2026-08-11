@@ -46,6 +46,7 @@ jobs:
       - name: Build release APK
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          VERSION_CODE_OVERRIDE: ${{ github.run_number }}
         run: gradle assembleRelease --stacktrace --parallel --build-cache
 
       - name: Locate APK
