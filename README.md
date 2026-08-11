@@ -545,3 +545,13 @@ the GitHub Actions route above is much faster in practice.
   `Documents/VideoResizer/logs/` (lewat file manager mana pun) sebelum minta
   Logcat/ADB — isinya versi app, OS, model device, thread, dan stack trace
   lengkap.
+- **Status visual/UI**: **Batch 3** (lihat `CHANGELOG.md`) menambahkan tema
+  ke-5, **"Midnight Blue Glass"** — gaya glassmorphism iOS dengan gradasi
+  midnight-blue di belakang tiap layar — dan menjadikannya default baru
+  aplikasi (tema Dark/Light/Midnight Neon/Warm Paper tetap ada, bisa dipilih
+  lewat menu tema di top bar). Semua di `ui/theme/` (`Color.kt`, `Type.kt`,
+  `Theme.kt`) plus penyesuaian ringan di `MainActivity.kt` (background
+  per-layar, border+shape 4 Card, 2 gradient CTA jadi theme-aware). Tidak
+  ada blur asli (`RenderEffect`/API 31+) — efek kaca dicapai lewat
+  transparansi + border tipis + gradasi latar, jadi tetap konsisten di
+  semua versi Android yang didukung app (minSdk 24).

@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,8 +61,6 @@ import androidx.media3.common.util.UnstableApi
 import kotlin.math.roundToInt
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.example.videoresizer.ui.theme.AccentPrimary
-import com.example.videoresizer.ui.theme.AccentSecondary
 import com.example.videoresizer.ui.theme.VideoResizerTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,7 +70,7 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 
-private enum class ThemePreference { SYSTEM, LIGHT, DARK, MIDNIGHT_NEON, WARM_PAPER }
+private enum class ThemePreference { SYSTEM, LIGHT, DARK, MIDNIGHT_NEON, WARM_PAPER, MIDNIGHT_BLUE_GLASS }
 private enum class Screen { MAIN, STUDIO, BATCH }
 
 class MainActivity : ComponentActivity() {
@@ -80,14 +79,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var themePref by remember { mutableStateOf(ThemePreference.DARK) }
+            var themePref by remember { mutableStateOf(ThemePreference.MIDNIGHT_BLUE_GLASS) }
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             val resolvedStyle = when (themePref) {
-                ThemePreference.SYSTEM -> if (systemDark) com.example.videoresizer.ui.theme.AppThemeStyle.DARK else com.example.videoresizer.ui.theme.AppThemeStyle.LIGHT
+                ThemePreference.SYSTEM -> if (systemDark) com.example.videoresizer.ui.theme.AppThemeStyle.MIDNIGHT_BLUE_GLASS else com.example.videoresizer.ui.theme.AppThemeStyle.LIGHT
                 ThemePreference.LIGHT -> com.example.videoresizer.ui.theme.AppThemeStyle.LIGHT
                 ThemePreference.DARK -> com.example.videoresizer.ui.theme.AppThemeStyle.DARK
                 ThemePreference.MIDNIGHT_NEON -> com.example.videoresizer.ui.theme.AppThemeStyle.MIDNIGHT_NEON
                 ThemePreference.WARM_PAPER -> com.example.videoresizer.ui.theme.AppThemeStyle.WARM_PAPER
+                ThemePreference.MIDNIGHT_BLUE_GLASS -> com.example.videoresizer.ui.theme.AppThemeStyle.MIDNIGHT_BLUE_GLASS
             }
 
             VideoResizerTheme(style = resolvedStyle, dynamicColor = false) {
@@ -675,7 +675,14 @@ private fun ResizerScreen(
         )
     }
 
+    val isGlass = com.example.videoresizer.ui.theme.LocalIsGlassTheme.current
+    val screenBackground = if (isGlass) {
+        com.example.videoresizer.ui.theme.MidnightBlueGlassGradient
+    } else {
+        androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.background)
+    }
     Scaffold(
+        modifier = Modifier.fillMaxSize().background(screenBackground),
         topBar = {
             TopAppBar(
                 title = {
@@ -684,7 +691,7 @@ private fun ResizerScreen(
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Brush.linearGradient(listOf(AccentPrimary, AccentSecondary))),
+                                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Filled.Movie, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
@@ -709,7 +716,7 @@ private fun ResizerScreen(
                                     ThemePreference.SYSTEM -> Icons.Filled.DarkMode
                                     // Custom themes get their own icon rather than being forced
                                     // into a light/dark bucket that doesn't really describe them.
-                                    ThemePreference.MIDNIGHT_NEON, ThemePreference.WARM_PAPER -> Icons.Filled.Palette
+                                    ThemePreference.MIDNIGHT_NEON, ThemePreference.WARM_PAPER, ThemePreference.MIDNIGHT_BLUE_GLASS -> Icons.Filled.Palette
                                 },
                                 contentDescription = "Theme"
                             )
@@ -721,16 +728,17 @@ private fun ResizerScreen(
                             androidx.compose.material3.HorizontalDivider()
                             DropdownMenuItem(text = { Text("Midnight Neon") }, onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_NEON); showThemeMenu = false })
                             DropdownMenuItem(text = { Text("Warm Paper") }, onClick = { onThemePrefChange(ThemePreference.WARM_PAPER); showThemeMenu = false })
+                            DropdownMenuItem(text = { Text("Midnight Blue Glass") }, onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_BLUE_GLASS); showThemeMenu = false })
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { padding ->
         Column(
             modifier = Modifier
@@ -1092,7 +1100,7 @@ private fun ResizerScreen(
                 } else {
                     val canResize = endMs > startMs
                     val ctaBrush = if (canResize) {
-                        Brush.horizontalGradient(listOf(AccentPrimary, AccentSecondary))
+                        Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))
                     } else {
                         val dim = MaterialTheme.colorScheme.surfaceVariant
                         Brush.horizontalGradient(listOf(dim, dim))
@@ -1181,7 +1189,8 @@ private fun ResizerScreen(
                 resultMessage?.let { msg ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        shape = RoundedCornerShape(14.dp)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        shape = MaterialTheme.shapes.large
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Text(msg, color = MaterialTheme.colorScheme.onSurface)
@@ -1556,7 +1565,14 @@ private fun BatchScreen(onBack: () -> Unit) {
         onBack()
     }
 
+    val isGlass = com.example.videoresizer.ui.theme.LocalIsGlassTheme.current
+    val screenBackground = if (isGlass) {
+        com.example.videoresizer.ui.theme.MidnightBlueGlassGradient
+    } else {
+        androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.background)
+    }
     Scaffold(
+        modifier = Modifier.fillMaxSize().background(screenBackground),
         topBar = {
             TopAppBar(
                 title = { Text("Batch Export", fontWeight = FontWeight.SemiBold) },
@@ -1567,9 +1583,11 @@ private fun BatchScreen(onBack: () -> Unit) {
                     }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
+        },
+        containerColor = Color.Transparent
     ) { padding ->
         Column(
             modifier = Modifier
@@ -1928,7 +1946,8 @@ private fun VideoEditorPreview(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2246,7 +2265,8 @@ private fun VideoPickerCard(onPickClick: () -> Unit) {
     Card(
         onClick = onPickClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -2531,7 +2551,14 @@ private fun StudioScreen(
         onBack()
     }
 
+    val isGlass = com.example.videoresizer.ui.theme.LocalIsGlassTheme.current
+    val screenBackground = if (isGlass) {
+        com.example.videoresizer.ui.theme.MidnightBlueGlassGradient
+    } else {
+        androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.background)
+    }
     Scaffold(
+        modifier = Modifier.fillMaxSize().background(screenBackground),
         topBar = {
             TopAppBar(
                 title = { Text("Studio", fontWeight = FontWeight.SemiBold) },
@@ -2541,12 +2568,12 @@ private fun StudioScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color.Transparent
     ) { padding ->
         if (entries.isEmpty()) {
             Box(
@@ -2623,7 +2650,8 @@ private fun StudioEntryCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

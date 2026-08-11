@@ -1,5 +1,6 @@
 package com.example.videoresizer.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 val Color_WhiteOn = Color(0xFFFFFFFF)
@@ -56,3 +57,29 @@ val PaperPrimary = Color(0xFFC96342)
 val PaperSecondary = Color(0xFF7A8B5C)
 val PaperError = Color(0xFFB3413A)
 val PaperOutline = Color(0xFFDCC9A8)
+
+// "Midnight Blue Glass" — iOS-style glassmorphism, the app's new default
+// look: a deep midnight-blue vertical gradient behind everything (painted
+// as a Brush, since a flat ColorScheme.background can't hold a gradient),
+// with frosted, semi-transparent "glass" cards floating on top — alpha-based
+// translucent fills + a soft light-colored hairline border, which reads as
+// glass on any device without needing true backdrop blur (which would need
+// gating around API 31's RenderEffect and buys little extra over a gradient
+// backdrop this dark). Paired in Theme.kt with much larger, iOS-style
+// continuous corner radii and in Type.kt with tighter letter-spacing.
+val GlassGradientTop = Color(0xFF0A0F24)
+val GlassGradientMid = Color(0xFF121B3E)
+val GlassGradientBottom = Color(0xFF1B2A5C)
+val GlassSurface = Color(0x33FFFFFF)
+val GlassSurfaceVariant = Color(0x22FFFFFF)
+val GlassOnBackground = Color(0xFFF2F5FF)
+val GlassOnSurfaceMuted = Color(0xFFB9C2E0)
+val GlassPrimary = Color(0xFF4C8DFF)
+val GlassSecondary = Color(0xFF64D2FF)
+val GlassError = Color(0xFFFF6B6B)
+val GlassBorder = Color(0x40FFFFFF)
+
+/** The gradient painted behind every screen when Midnight Blue Glass is active. */
+val MidnightBlueGlassGradient = Brush.verticalGradient(
+    listOf(GlassGradientTop, GlassGradientMid, GlassGradientBottom)
+)

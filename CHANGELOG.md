@@ -1,5 +1,71 @@
 # Changelog
 
+## Unreleased — Batch 3 (Atomic): "Midnight Blue Glass" UI/UX overhaul
+
+Single atomic change — a full visual-identity overhaul can't be meaningfully
+split into smaller batches without leaving the UI in an inconsistent
+half-restyled state, so this exceeds the usual per-batch file guidance on
+purpose (justification per the Atomic Change rule).
+
+Adds a fifth selectable theme, **Midnight Blue Glass** — an iOS-style
+glassmorphism look with a midnight-blue gradient backdrop — and makes it the
+app's **new default** (Dark/Light/Midnight Neon/Warm Paper are all still
+selectable from the theme menu; nothing existing was removed).
+
+- **`ui/theme/Color.kt`** — new palette: `GlassGradientTop/Mid/Bottom` (the
+  backdrop), translucent `GlassSurface`/`GlassSurfaceVariant` (what makes
+  cards read as frosted glass), `GlassBorder` (the frosted-edge hairline),
+  `GlassPrimary`/`GlassSecondary` (iOS-blue/cyan accents), plus
+  `MidnightBlueGlassGradient`, the actual `Brush` painted behind every
+  screen (a flat `ColorScheme.background` can't hold a gradient, hence a
+  separate Brush constant).
+- **`ui/theme/Type.kt`** — `GlassTypography`: tighter (slightly negative)
+  letter-spacing and bolder titles for the dense, tracked-in look of iOS
+  system type. Platform default sans family — no bundled font files.
+- **`ui/theme/Theme.kt`** — `GlassColors` ColorScheme, `GlassShapes` (large
+  iOS-"squircle" corner radii: 10/14/20/26/34dp vs. Material3's
+  4/8/12/16/28dp default), `AppThemeStyle.MIDNIGHT_BLUE_GLASS` added to the
+  enum, wired into every `when` in `VideoResizerTheme`, and made the default
+  when following system dark mode. New `LocalIsGlassTheme` CompositionLocal
+  so each screen can tell whether to paint the gradient or a plain flat
+  background, without threading an extra parameter through every screen's
+  function signature.
+- **`MainActivity.kt`** (UI-only edits, business logic untouched):
+  - `ThemePreference` enum + theme dropdown menu gained a "Midnight Blue
+    Glass" entry; default `themePref` state changed to it.
+  - Each of the three screens (`ResizerScreen`, `StudioScreen`,
+    `BatchScreen`) now paints its own opaque background — the Midnight Blue
+    Glass gradient, or the previous flat color for every other theme — via
+    its `Scaffold`'s own `modifier`, with `containerColor = Color.Transparent`
+    so that background shows through. This is deliberately **per-screen**,
+    not a single shared background painted once at the app root: the v1.8
+    fix that keeps the main screen permanently composed underneath
+    Studio/Batch relies on each overlay screen's background being fully
+    opaque on its own, and a single root layer would have broken that
+    occlusion.
+  - The four `Card(...)` composables (result card, video-editor-preview
+    card, video-picker card, batch queue-item card) gained a themed
+    `border` (invisible-thin on Dark/Light/Neon/Paper, a visible frosted
+    hairline on Glass) and switched from hardcoded per-call
+    `RoundedCornerShape(..dp)` to `MaterialTheme.shapes.large`, so they
+    finally pick up each theme's shape language the way every other
+    component already did (a small pre-existing inconsistency, fixed as
+    part of the same pass rather than left half-done).
+  - The two hardcoded `AccentPrimary`/`AccentSecondary` gradients (app-mark
+    icon in the top bar, the primary "Resize video" CTA button) now read
+    `MaterialTheme.colorScheme.primary`/`.secondary` instead, so they
+    actually pick up each theme's accent colors — previously they always
+    rendered Dark theme's purple/teal regardless of which theme was active,
+    which would have undercut Glass's whole point (its accent is iOS-blue/
+    cyan, not purple/teal). Zero visual change for Dark itself, since
+    `DarkColors.primary`/`.secondary` already equal those same constants.
+
+No true backdrop blur (`RenderEffect`, Android 12+/API 31 only): the
+translucent glass fills + gradient backdrop + frosted border already read
+clearly as glassmorphism without needing API-level gating, and true blur
+would need to sample the gradient itself, not surrounding app content, so
+it would add little.
+
 ## Unreleased — Batch 2: Crash logger, GitHub Release publishing, force-unwrap cleanup
 
 Atomic batch — three independent-but-related hardening items shipped together

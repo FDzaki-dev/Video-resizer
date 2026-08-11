@@ -46,3 +46,18 @@ val PaperTypography = Typography(
     labelLarge = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp),
     labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp)
 )
+
+/**
+ * Midnight Blue Glass's type scale: tighter (slightly negative) letter
+ * spacing and bolder titles for the dense, tracked-in look of iOS system
+ * type, using the platform's default sans family (no bundled font files,
+ * same zero-new-asset guarantee as Neon/Paper above).
+ */
+val GlassTypography = Typography(
+    titleLarge = TextStyle(fontWeight = FontWeight.Bold, fontSize = 24.sp, letterSpacing = (-0.3).sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 18.sp, letterSpacing = (-0.2).sp),
+    bodyLarge = TextStyle(fontWeight = FontWeight.Normal, fontSize = 16.sp, letterSpacing = (-0.1).sp),
+    bodyMedium = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp, letterSpacing = (-0.1).sp),
+    labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp)
+)
