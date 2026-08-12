@@ -1,5 +1,92 @@
 # Changelog
 
+## Unreleased — Batch 9 (Atomic): Video-ke-GIF, Flip/Frame Rate, Compress by Target Size
+
+Atomic change (not split across multiple batches) because all three features
+share the same export/UI surface (`VideoResizer.kt`'s pipeline,
+`ResizeRequest`, and the Resizer screen's option sections) and reviewing
+them together was more coherent than reviewing three partial diffs to the
+same functions.
+
+- **New: Video ke GIF** (`GifEncoder.kt`, `GifExporter.kt`, both new files;
+  new `GifScreen` in `MainActivity.kt`, reachable via a new nav icon next
+  to Batch) — converts a trimmed clip into an animated GIF, entirely
+  independent of the Media3 Transformer pipeline the rest of the app uses,
+  since GIF isn't a video codec Transformer can target:
+  - `GifEncoder.kt` — a from-spec, dependency-free GIF89a + LZW encoder
+    (no third-party GIF library). Single shared global color table for the
+    whole clip, NETSCAPE2.0 loop extension, standard 12-bit/4096-entry LZW
+    dictionary with clear-code reset.
+  - `GifExporter.kt` — extracts frames via
+    `MediaMetadataRetriever.getFrameAtTime` (same technique
+    `FilmstripExtractor` already used, just at higher frame count/res),
+    builds one 256-color palette for the whole clip with a frequency/
+    popularity bucket algorithm (deliberately simpler than median-cut/
+    NeuQuant — easier to verify by hand without a local compiler; a good
+    target to revisit if quality matters more than this first pass),
+    nearest-color-quantizes every frame against it, hands the result to
+    `GifEncoder`. Hard-capped at `MAX_FRAMES = 200` as a backstop; the UI
+    estimates frame count live and disables the button before hitting it.
+  - Fps presets 5/10/15, width presets 240/360/480px, publishes to
+    `Pictures/VideoResizer/` via a new `PublicMovieExporter.publishImage()`
+    (mirrors the existing `publish()` for video, just `image/gif` mime and
+    the Images MediaStore collection instead of Video).
+  - **Not done this batch**: GIF results aren't written to Studio history
+    (`VideoHistoryStore`) — they're share/gallery-only for now, same as a
+    fresh video export before it's saved. Flagged for a future batch if
+    GIF re-editing turns out to matter.
+- **New: Flip / mirror** (`VideoResizer.kt` — `FlipOption` enum;
+  `MainActivity.kt` — chip row in `ResizerScreen`, right under Rotasi) —
+  horizontal/vertical mirror, folded into the *same*
+  `ScaleAndRotateTransformation` that already handled rotation (its builder
+  accepts scale and rotation together) rather than adding a second Effect
+  entry, so flip and rotation compose in a single GL pass exactly like
+  before this feature existed for rotation alone.
+- **New: Frame rate control** (`VideoResizer.kt` — `FrameRateOption` enum,
+  backed by `androidx.media3.effect.FrameDropEffect
+  .createDefaultFrameDropEffect(targetFps)`; `MainActivity.kt` — chip row
+  right under Flip) — Original/24/30/60fps presets. `FrameDropEffect` only
+  needs the *target* rate (it decides per-frame keep/drop from presentation
+  timestamps), so no "read the source's frame rate first" step was needed.
+  **Required bumping `media3-transformer`/`-effect`/`-common`/`-exoplayer`/
+  `-ui` from 1.3.1 → 1.4.1** (`app/build.gradle.kts`, `[PROTECTED]`,
+  edited per the edit-parsial-only rule) — `FrameDropEffect` doesn't exist
+  at 1.3.1. Deliberately stopped at 1.4.1, not the latest: Media3 1.6.0
+  flips the `OverlaySettings` anchor-point sign convention (see the
+  `WatermarkPosition` doc comment in `VideoResizer.kt`, added back when
+  that was first discovered), which would silently break watermark/caption
+  placement if picked up here. 1.4.1 is the earliest stable release with
+  `FrameDropEffect` and predates that change.
+- **New: Compress by Target File Size (MB)** (`VideoResizer.kt` — new
+  `requiredBitrateKbpsForTargetSize(targetSizeMb, durationMs, muteAudio)`
+  companion function, the algebraic inverse of the existing
+  `estimateOutputSizeBytes`; `MainActivity.kt` — new `TargetSizeDialog` +
+  an extra chip in the Quality row) — deliberately **not** a new
+  `ResizeRequest` field or export-pipeline code path: the dialog solves
+  MB → kbps once and writes the result into the *existing*
+  `quality = CUSTOM` / `customBitrateKbps` state, the same state
+  `CustomBitrateDialog` already drives. The export pipeline needed zero
+  changes for this feature as a result.
+- **`VideoHistoryStore.kt`**: `flipName`/`frameRateName` fields added to
+  `VideoHistoryEntry` (with `FlipOption.NONE`/`FrameRateOption.ORIGINAL`
+  fallbacks via `optString`, so entries saved before this batch still load
+  and default to the pre-existing behavior), wired through "Edit ulang"
+  the same way rotation/quality already were.
+- **Not done this batch** (scope cut, noted rather than silently skipped):
+  Flip/Frame Rate/Target-Size controls were added to `ResizerScreen` only,
+  not `BatchScreen` — batch-export jobs currently always use
+  `FlipOption.NONE`/`FrameRateOption.ORIGINAL` (safe defaults, matches old
+  behavior exactly). Extending `BatchScreen` similarly is straightforward
+  follow-up, deferred to keep this batch's diff reviewable.
+- **Known limitation**: GIF export's "Batalkan" (cancel) button is a soft
+  cancel — it hides the progress UI immediately, but `GifExporter.export`
+  runs as one synchronous call on `Dispatchers.Default` with no internal
+  cancellation checks, so frame extraction/quantization/encoding already in
+  flight keeps running to completion in the background (result just gets
+  discarded) rather than stopping instantly. Not a correctness bug — no
+  wrong file is ever shown or saved — but worth knowing before assuming
+  "Batalkan" frees up CPU immediately.
+
 ## Unreleased — Batch 8: Finish everything left pending (caption overlay, batch thumbnails, dynamic versionName)
 
 Closes out every item that had been left as a "not done yet" note across

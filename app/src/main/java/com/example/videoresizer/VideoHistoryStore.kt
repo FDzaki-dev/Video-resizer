@@ -49,7 +49,10 @@ data class VideoHistoryEntry(
     val watermarkScalePercent: Int = 18,
     /** Caption text used for this export, if any. Null/blank for entries saved before this field existed. */
     val captionText: String? = null,
-    val captionPositionName: String = WatermarkPosition.BOTTOM_RIGHT.name
+    val captionPositionName: String = WatermarkPosition.BOTTOM_RIGHT.name,
+    /** Flip/frame-rate settings used for this export. Defaults keep entries saved before Batch 9 readable. */
+    val flipName: String = FlipOption.NONE.name,
+    val frameRateName: String = FrameRateOption.ORIGINAL.name
 )
 
 /**
@@ -128,6 +131,8 @@ object VideoHistoryStore {
         put("watermarkScalePercent", entry.watermarkScalePercent)
         put("captionText", entry.captionText)
         put("captionPositionName", entry.captionPositionName)
+        put("flipName", entry.flipName)
+        put("frameRateName", entry.frameRateName)
     }
 
     private fun fromJson(obj: JSONObject): VideoHistoryEntry? = runCatching {
@@ -158,7 +163,9 @@ object VideoHistoryStore {
             watermarkOpacityPercent = if (obj.has("watermarkOpacityPercent")) obj.optInt("watermarkOpacityPercent", 70) else 70,
             watermarkScalePercent = if (obj.has("watermarkScalePercent")) obj.optInt("watermarkScalePercent", 18) else 18,
             captionText = obj.optString("captionText", "").ifEmpty { null },
-            captionPositionName = obj.optString("captionPositionName", WatermarkPosition.BOTTOM_RIGHT.name)
+            captionPositionName = obj.optString("captionPositionName", WatermarkPosition.BOTTOM_RIGHT.name),
+            flipName = obj.optString("flipName", FlipOption.NONE.name),
+            frameRateName = obj.optString("frameRateName", FrameRateOption.ORIGINAL.name)
         )
     }.getOrNull()
 }

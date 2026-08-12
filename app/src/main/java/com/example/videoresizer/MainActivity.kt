@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Gif
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Palette
@@ -72,7 +73,7 @@ import java.util.Locale
 import java.util.UUID
 
 private enum class ThemePreference { SYSTEM, LIGHT, DARK, MIDNIGHT_NEON, WARM_PAPER, MIDNIGHT_BLUE_GLASS }
-private enum class Screen { MAIN, STUDIO, BATCH }
+private enum class Screen { MAIN, STUDIO, BATCH, GIF }
 
 class MainActivity : ComponentActivity() {
 
@@ -172,7 +173,9 @@ private data class PrefillSettings(
     val watermarkOpacityPercent: Int,
     val watermarkScalePercent: Int,
     val captionText: String?,
-    val captionPosition: WatermarkPosition
+    val captionPosition: WatermarkPosition,
+    val flip: FlipOption,
+    val frameRate: FrameRateOption
 )
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -206,6 +209,7 @@ private fun VideoResizerApp(
             onThemePrefChange = onThemePrefChange,
             onOpenStudio = { screen = Screen.STUDIO },
             onOpenBatch = { screen = Screen.BATCH },
+            onOpenGif = { screen = Screen.GIF },
             isForeground = screen == Screen.MAIN,
             prefill = prefill,
             onPrefillConsumed = { prefill = null },
@@ -214,6 +218,11 @@ private fun VideoResizerApp(
         )
         if (screen == Screen.BATCH) {
             BatchScreen(
+                onBack = { screen = Screen.MAIN }
+            )
+        }
+        if (screen == Screen.GIF) {
+            GifScreen(
                 onBack = { screen = Screen.MAIN }
             )
         }
@@ -239,7 +248,9 @@ private fun VideoResizerApp(
                         watermarkOpacityPercent = entry.watermarkOpacityPercent,
                         watermarkScalePercent = entry.watermarkScalePercent,
                         captionText = entry.captionText,
-                        captionPosition = WatermarkPosition.ENTRIES.firstOrNull { it.name == entry.captionPositionName } ?: WatermarkPosition.BOTTOM_RIGHT
+                        captionPosition = WatermarkPosition.ENTRIES.firstOrNull { it.name == entry.captionPositionName } ?: WatermarkPosition.BOTTOM_RIGHT,
+                        flip = FlipOption.ENTRIES.firstOrNull { it.name == entry.flipName } ?: FlipOption.NONE,
+                        frameRate = FrameRateOption.ENTRIES.firstOrNull { it.name == entry.frameRateName } ?: FrameRateOption.ORIGINAL
                     )
                     screen = Screen.MAIN
                 },
@@ -260,6 +271,7 @@ private fun ResizerScreen(
     onThemePrefChange: (ThemePreference) -> Unit,
     onOpenStudio: () -> Unit,
     onOpenBatch: () -> Unit,
+    onOpenGif: () -> Unit,
     isForeground: Boolean,
     prefill: PrefillSettings?,
     onPrefillConsumed: () -> Unit,
@@ -283,6 +295,12 @@ private fun ResizerScreen(
     var resolution by remember { mutableStateOf(ResolutionOption.ORIGINAL) }
     var resizeMode by remember { mutableStateOf(ResizeMode.CROP) }
     var rotation by remember { mutableStateOf(RotationOption.NONE) }
+    // Flip/frame-rate: independent output-transform controls alongside
+    // rotation. Kept as separate state (not folded into `rotation`) since
+    // flip and rotation compose freely and the UI offers them as two
+    // separate chip rows.
+    var flip by remember { mutableStateOf(FlipOption.NONE) }
+    var frameRate by remember { mutableStateOf(FrameRateOption.ORIGINAL) }
     var muteAudio by remember { mutableStateOf(false) }
     var trimRange by remember { mutableStateOf(0f..1f) }
     var isProcessing by remember { mutableStateOf(false) }
@@ -327,6 +345,13 @@ private fun ResizerScreen(
     var quality by remember { mutableStateOf(QualityOption.ORIGINAL) }
     var showCustomBitrateDialog by remember { mutableStateOf(false) }
     var customBitrateKbps by remember { mutableStateOf<Int?>(null) }
+    // "Ukuran target (MB)" — an alternate entry point into the same
+    // quality=CUSTOM/customBitrateKbps fields above rather than a separate
+    // ResizeRequest field: the dialog below just solves MB -> kbps via
+    // VideoResizer.requiredBitrateKbpsForTargetSize and writes the result
+    // into the existing customBitrateKbps state, so the export pipeline
+    // needs no separate "target size" code path at all.
+    var showTargetSizeDialog by remember { mutableStateOf(false) }
     var filmstrip by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     // Watermark/logo overlay — a still image, drawn in a fixed corner at a
     // fixed opacity/size for the whole clip. watermarkUri null = no watermark.
@@ -361,6 +386,8 @@ private fun ResizerScreen(
                 resolution != ResolutionOption.ORIGINAL ||
                 resizeMode != ResizeMode.CROP ||
                 rotation != RotationOption.NONE ||
+                flip != FlipOption.NONE ||
+                frameRate != FrameRateOption.ORIGINAL ||
                 muteAudio ||
                 trimRange != 0f..1f ||
                 quality != QualityOption.ORIGINAL ||
@@ -425,6 +452,8 @@ private fun ResizerScreen(
                 aspectRatio = p.aspectRatio
                 resolution = p.resolution
                 rotation = p.rotation
+                flip = p.flip
+                frameRate = p.frameRate
                 muteAudio = p.muteAudio
                 resizeMode = p.resizeMode
                 customWidth = p.customWidth
@@ -687,6 +716,19 @@ private fun ResizerScreen(
         )
     }
 
+    if (showTargetSizeDialog) {
+        TargetSizeDialog(
+            durationMs = (trimRange.endInclusive * durationMs).toLong() - (trimRange.start * durationMs).toLong(),
+            muteAudio = muteAudio,
+            onDismiss = { showTargetSizeDialog = false },
+            onSave = { kbps ->
+                customBitrateKbps = kbps
+                quality = QualityOption.CUSTOM
+                showTargetSizeDialog = false
+            }
+        )
+    }
+
     val isGlass = com.example.videoresizer.ui.theme.LocalIsGlassTheme.current
     val screenBackground = if (isGlass) {
         com.example.videoresizer.ui.theme.MidnightBlueGlassGradient
@@ -715,6 +757,9 @@ private fun ResizerScreen(
                 actions = {
                     IconButton(onClick = onOpenBatch) {
                         Icon(Icons.Filled.Layers, contentDescription = "Batch export")
+                    }
+                    IconButton(onClick = onOpenGif) {
+                        Icon(Icons.Filled.Gif, contentDescription = "Video ke GIF")
                     }
                     IconButton(onClick = onOpenStudio) {
                         Icon(Icons.Filled.PhotoLibrary, contentDescription = "Studio")
@@ -946,6 +991,25 @@ private fun ResizerScreen(
                                 )
                             )
                         }
+                        // Not one of QualityOption.ENTRIES — this is a second
+                        // entry point into the exact same quality=CUSTOM/
+                        // customBitrateKbps state as the chips above, just
+                        // driven by a target file size instead of a bitrate
+                        // number. See TargetSizeDialog / requiredBitrateKbpsForTargetSize.
+                        item {
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    selectedSocialPreset = null
+                                    showTargetSizeDialog = true
+                                },
+                                label = { Text("Ukuran target (MB)") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
                     }
                     // UX: gives a novice user a concrete before-you-commit
                     // number instead of an abstract "Rendah/Sedang/Tinggi"
@@ -1113,6 +1177,31 @@ private fun ResizerScreen(
                     onSelect = { rotation = it }
                 )
 
+                OptionSection(
+                    title = "Flip / cermin",
+                    options = FlipOption.ENTRIES,
+                    labelOf = { it.label },
+                    selected = flip,
+                    onSelect = { flip = it }
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OptionSection(
+                        title = "Frame rate",
+                        options = FrameRateOption.ENTRIES,
+                        labelOf = { it.label },
+                        selected = frameRate,
+                        onSelect = { frameRate = it }
+                    )
+                    if (frameRate != FrameRateOption.ORIGINAL) {
+                        Text(
+                            "Frame yang melebihi ${frameRate.fps} fps akan dibuang agar video terasa lebih halus/hemat ukuran; frame rate sumber yang lebih rendah tidak akan dipaksa naik.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1217,7 +1306,9 @@ private fun ResizerScreen(
                                 watermarkOpacityPercent = watermarkOpacityPercent.roundToInt(),
                                 watermarkScalePercent = watermarkScalePercent.roundToInt(),
                                 captionText = captionText,
-                                captionPosition = captionPosition
+                                captionPosition = captionPosition,
+                                flip = flip,
+                                frameRate = frameRate
                             )
                             // Before/after comparison: this same thumbnail file is
                             // already generated for Studio history once export
@@ -2607,6 +2698,88 @@ private fun CustomBitrateDialog(
     )
 }
 
+/**
+ * Alternate entry point into the same quality=CUSTOM/customBitrateKbps
+ * state CustomBitrateDialog writes to, just driven by a target file size in
+ * MB instead of a raw kbps number — see
+ * VideoResizer.requiredBitrateKbpsForTargetSize for the MB -> kbps math.
+ */
+@Composable
+private fun TargetSizeDialog(
+    durationMs: Long,
+    muteAudio: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit
+) {
+    var sizeText by remember { mutableStateOf("") }
+    val sizeValue = sizeText.toDoubleOrNull()
+    val computedKbps = if (sizeValue != null && sizeValue > 0.0 && durationMs > 0) {
+        VideoResizer.requiredBitrateKbpsForTargetSize(sizeValue, durationMs, muteAudio)
+    } else {
+        null
+    }
+    val error = when {
+        sizeText.isEmpty() -> null
+        sizeValue == null || sizeValue <= 0.0 -> "Tidak valid"
+        durationMs <= 0 -> "Pilih video & rentang trim dulu"
+        computedKbps == null -> "Ukuran ini terlalu kecil untuk durasi klip ini"
+        else -> null
+    }
+
+    AlertDialog(
+        onDismissRequest = {
+            // Same "accidental dismiss" guard as CustomBitrateDialog: tapping
+            // outside must not silently discard a typed value.
+        },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        ),
+        title = { Text("Ukuran Target (MB)") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .imePadding()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedTextField(
+                    value = sizeText,
+                    onValueChange = { input -> sizeText = input.filter { c -> c.isDigit() || c == '.' }.take(6) },
+                    label = { Text("Ukuran file target (MB)") },
+                    singleLine = true,
+                    isError = error != null,
+                    supportingText = {
+                        when {
+                            error != null -> Text(error)
+                            computedKbps != null -> Text("≈ $computedKbps kbps untuk durasi klip yang dipilih saat ini.")
+                            else -> Text("Contoh: 16 untuk target upload WhatsApp Status/Story.")
+                        }
+                    },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Perkiraan kasar (asumsi audio ~128 kbps jika tidak dibisukan). Bitrate video dihitung mundur dari ukuran target dibagi durasi klip yang sedang dipilih.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { computedKbps?.let(onSave) },
+                enabled = computedKbps != null
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> OptionSection(
@@ -2942,7 +3115,9 @@ private fun runResize(
                                             watermarkOpacityPercent = request.watermarkOpacityPercent,
                                             watermarkScalePercent = request.watermarkScalePercent,
                                             captionText = request.captionText,
-                                            captionPositionName = request.captionPosition.name
+                                            captionPositionName = request.captionPosition.name,
+                                            flipName = request.flip.name,
+                                            frameRateName = request.frameRate.name
                                         )
                                     )
                                 }
@@ -3033,4 +3208,314 @@ private fun shareVideoUri(context: android.content.Context, uri: Uri) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, "Share resized video"))
+}
+
+/** GIF counterpart of [shareVideo] — same FileProvider-wrapping approach, just "image/gif" mime. */
+private fun shareGifFile(context: android.content.Context, file: File) {
+    if (!file.exists()) {
+        android.widget.Toast.makeText(context, "File GIF tidak ditemukan (mungkin cache sudah dibersihkan).", android.widget.Toast.LENGTH_LONG).show()
+        return
+    }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/gif"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share GIF"))
+}
+
+/** GIF counterpart of [openInGallery] — same ACTION_VIEW approach, just "image/gif" mime. */
+private fun openGifInGallery(context: android.content.Context, uri: Uri) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "image/gif")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+    } catch (e: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(context, "Tidak ada aplikasi Galeri yang bisa membuka GIF ini.", android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
+/**
+ * Standalone "Video ke GIF" screen. Deliberately not folded into
+ * ResizerScreen: GIF export is a completely different pipeline
+ * (GifExporter, no Transformer/Media3 involved) with its own narrower
+ * settings (fps/width instead of the full resize option set), so a separate
+ * screen keeps both simpler than one screen branching on output format.
+ *
+ * Reuses VideoPickerCard/VideoEditorPreview/FilmstripExtractor from the
+ * main resizer flow for a consistent picking/trimming experience.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GifScreen(onBack: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var sourceWidth by remember { mutableIntStateOf(0) }
+    var sourceHeight by remember { mutableIntStateOf(0) }
+    var trimRange by remember { mutableStateOf(0f..1f) }
+    var filmstrip by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    var fps by remember { mutableIntStateOf(10) }
+    var targetWidth by remember { mutableIntStateOf(360) }
+    var isProcessing by remember { mutableStateOf(false) }
+    var progress by remember { mutableIntStateOf(0) }
+    var resultFile by remember { mutableStateOf<File?>(null) }
+    var galleryUri by remember { mutableStateOf<Uri?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var activeJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    val pickVideoLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            resultFile = null
+            galleryUri = null
+            message = null
+            scope.launch {
+                val loaded = withContext(Dispatchers.IO) {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, uri)
+                        val d = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                        val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+                        val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+                        if (d > 0) Triple(d, w, h) else null
+                    } catch (e: Exception) {
+                        null
+                    } finally {
+                        retriever.release()
+                    }
+                }
+                if (loaded != null) {
+                    selectedUri = uri
+                    durationMs = loaded.first
+                    sourceWidth = loaded.second
+                    sourceHeight = loaded.third
+                    trimRange = 0f..1f
+                } else {
+                    android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(selectedUri, durationMs) {
+        val uri = selectedUri
+        filmstrip = if (uri != null && durationMs > 0) {
+            withContext(Dispatchers.IO) { FilmstripExtractor.extract(context, uri, durationMs, count = 8) }
+        } else {
+            emptyList()
+        }
+    }
+
+    val startMs = (trimRange.start * durationMs).toLong()
+    val endMs = (trimRange.endInclusive * durationMs).toLong()
+    val clipSeconds = (endMs - startMs).coerceAtLeast(0L) / 1000.0
+    val estimatedFrames = (clipSeconds * fps).toInt().coerceAtLeast(0)
+    // Mirrors GifExporter.MAX_FRAMES: keeps the button's own warning in sync
+    // with the backstop the exporter itself enforces, rather than letting
+    // the UI promise something the exporter would silently cap anyway.
+    val framesTooMany = estimatedFrames > GifExporter.MAX_FRAMES
+
+    // Same reasoning as BatchScreen's BackHandler fix (see its comment):
+    // no Navigation-Compose back stack here, screens are manual state, so
+    // without this a system back press/gesture falls through to the
+    // default platform behavior and exits the whole app instead of
+    // returning to the Resizer screen underneath.
+    androidx.activity.compose.BackHandler(enabled = true) {
+        if (isProcessing) activeJob?.cancel()
+        onBack()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Video ke GIF") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            if (selectedUri == null || durationMs <= 0) {
+                VideoPickerCard(
+                    onPickClick = { pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
+                )
+            } else {
+                val currentUri = selectedUri!!
+                VideoEditorPreview(
+                    uri = currentUri,
+                    sourceWidth = sourceWidth,
+                    sourceHeight = sourceHeight,
+                    durationMs = durationMs,
+                    filmstrip = filmstrip,
+                    trimRange = trimRange,
+                    isForeground = true,
+                    onTrimRangeChange = { trimRange = it },
+                    onPickDifferent = {
+                        pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                    }
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Frame rate GIF", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(listOf(5, 10, 15)) { f ->
+                            FilterChip(
+                                selected = fps == f,
+                                onClick = { fps = f },
+                                label = { Text("$f fps") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Lebar GIF", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(listOf(240, 360, 480)) { w ->
+                            FilterChip(
+                                selected = targetWidth == w,
+                                onClick = { targetWidth = w },
+                                label = { Text("${w}px") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    if (framesTooMany) {
+                        "Perkiraan: ~$estimatedFrames frame — terlalu banyak untuk fps/lebar ini. Persingkat rentang trim, atau turunkan fps/lebar."
+                    } else {
+                        "Perkiraan: ~$estimatedFrames frame dari ${String.format(java.util.Locale.US, "%.1f", clipSeconds)} detik klip. Klip lebih panjang / fps & lebar lebih besar = proses lebih lama & file lebih besar."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (isProcessing) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LinearProgressIndicator(
+                            progress = { progress / 100f },
+                            modifier = Modifier.fillMaxWidth().height(6.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Membuat GIF… $progress%", color = MaterialTheme.colorScheme.onBackground)
+                            OutlinedButton(onClick = {
+                                activeJob?.cancel()
+                                isProcessing = false
+                                message = "Dibatalkan."
+                            }) { Text("Batalkan") }
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            val uri = selectedUri ?: return@Button
+                            isProcessing = true
+                            progress = 0
+                            message = null
+                            resultFile = null
+                            galleryUri = null
+                            val outFile = File(context.cacheDir, "gif_${UUID.randomUUID()}.gif")
+                            activeJob = scope.launch {
+                                val result = withContext(Dispatchers.Default) {
+                                    GifExporter.export(
+                                        context = context,
+                                        sourceUri = uri,
+                                        startMs = startMs,
+                                        endMs = endMs,
+                                        fps = fps,
+                                        targetWidth = targetWidth,
+                                        outputFile = outFile,
+                                        onProgress = { p ->
+                                            // GifExporter.export runs entirely on
+                                            // Dispatchers.Default and calls this
+                                            // synchronously from that background
+                                            // thread — hop back to Main before
+                                            // touching Compose state, rather than
+                                            // relying on the snapshot system to
+                                            // paper over a cross-thread write.
+                                            scope.launch(Dispatchers.Main) { progress = p }
+                                        }
+                                    )
+                                }
+                                isProcessing = false
+                                when (result) {
+                                    is GifExportResult.Success -> {
+                                        val publicUri = withContext(Dispatchers.IO) {
+                                            PublicMovieExporter.publishImage(context, outFile, outFile.name)
+                                        }
+                                        resultFile = outFile
+                                        galleryUri = publicUri
+                                        message = if (publicUri != null) {
+                                            "Selesai. GIF tersimpan di Galeri > Pictures > VideoResizer (${result.frameCount} frame)."
+                                        } else {
+                                            "GIF selesai dibuat (${result.frameCount} frame), tapi gagal disalin ke galeri publik. Tetap tersedia lewat tombol Share di bawah."
+                                        }
+                                    }
+                                    is GifExportResult.Failure -> {
+                                        message = "Gagal membuat GIF: ${result.reason}"
+                                    }
+                                }
+                            }
+                        },
+                        enabled = endMs > startMs && estimatedFrames > 0 && !framesTooMany,
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Buat GIF")
+                    }
+                }
+
+                message?.let { msg ->
+                    Text(msg, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground)
+                }
+
+                if (resultFile != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = { shareGifFile(context, resultFile!!) }) { Text("Share") }
+                        if (galleryUri != null) {
+                            OutlinedButton(onClick = { openGifInGallery(context, galleryUri!!) }) { Text("Buka di Galeri") }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

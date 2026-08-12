@@ -1,21 +1,31 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 6**. This is the first-read file per the context
+Snapshot as of **Batch 9**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
 architecture/quirk notes live in README.md.
 
 ## Current version
-- `versionName`/`versionCode` **both dynamic since Batch 8**: base semantic
-  label `"1.13"` (`val semanticVersionName` in `app/build.gradle.kts`,
-  bump manually per feature batch) with `-build<n>` appended in CI;
-  `versionCode` = `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain
-  `1.13` / `1013` for any non-CI build.
+- `versionName`/`versionCode` both dynamic since Batch 8: base semantic
+  label **`"1.14"`** (bumped from `1.13` this batch — `val
+  semanticVersionName` in `app/build.gradle.kts`, bump manually per feature
+  batch) with `-build<n>` appended in CI; `versionCode` =
+  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.14` / `1014` for
+  any non-CI build.
 - Package: `com.example.videoresizer`, minSdk 24, targetSdk/compileSdk 34
 - AGP 8.4.0, Kotlin 1.9.24, Gradle 8.7 (no wrapper jar — see FILE_MANIFEST.txt)
+- **Media3: 1.4.1** (bumped from 1.3.1 this batch, see Batch 9 below).
+  Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 9 (Atomic)** — Video ke GIF (`GifEncoder.kt`/`GifExporter.kt`,
+  new files, own from-spec GIF89a/LZW encoder, no Transformer involved),
+  Flip/mirror + Frame Rate control in the main Resizer screen (Media3
+  bumped 1.3.1→1.4.1 for `FrameDropEffect`), and Compress-by-Target-Size
+  (MB) reusing the existing CUSTOM-bitrate plumbing rather than adding a
+  new pipeline field. BatchScreen intentionally not extended with the two
+  new resize controls this round — see CHANGELOG's "Not done this batch".
 - **Batch 8** — Caption text overlay (Resizer + Batch screens, reuses the
   watermark's overlay pipeline), per-item thumbnails in the Batch Export
   queue, caption fields added to Studio history/"Edit ulang", and
@@ -57,6 +67,16 @@ architecture/quirk notes live in README.md.
 - **Crash logs** land in `Documents/VideoResizer/logs/` on-device via
   MediaStore, FIFO-capped at 50 files — check there first before asking
   for Logcat/ADB on any crash report.
+- **Media3 pinned at 1.4.1, do not bump past 1.5.x without care** (Batch
+  9) — 1.6.0 flips the `OverlaySettings` anchor-point sign convention used
+  by watermark/caption placement (`ScaleAndRotateTransformation`/
+  `OverlayEffect` usage in `VideoResizer.kt`). Any future media3 bump needs
+  that anchor math re-verified against whatever version is being moved to.
+- **GIF export is a separate pipeline**, not part of `VideoResizer`/
+  Transformer — `GifExporter.kt` decodes/quantizes/encodes everything
+  itself. If GIF output quality ever needs to improve, the palette
+  algorithm (`GifExporter.buildPalette`, a frequency-bucket approach) is
+  the place to swap in something like median-cut/NeuQuant.
 
 ## Known pending items (not yet actioned)
 - 🟡 Manual-only cleanup: the pre-Batch-5 duplicated `v1.13` GitHub Release
@@ -65,9 +85,22 @@ architecture/quirk notes live in README.md.
 - ⚪ Not done, flagged as risky-without-a-real-build (see CHANGELOG.md
   Batch 4 "Deliberately not done" section): AGP/Kotlin version bump,
   `org.gradle.configuration-cache=true`.
+- ⚪ **Batch 9 scope cut**: `BatchScreen` doesn't yet expose Flip/Frame
+  Rate/Target-Size — batch jobs use safe defaults (NONE/ORIGINAL) so
+  nothing broke, but the controls only exist in the single-video Resizer
+  screen for now.
+- ⚪ **Batch 9 scope cut**: GIF exports aren't written to `VideoHistoryStore`
+  — no "Edit ulang" for a past GIF yet, share/gallery-save only.
 
 ## Known constraints on this side (Claude's sandbox)
 - No `gradle`/`kotlinc`/`gh` available here — every batch is verified by
   structural checks (brace/paren balance, XML/YAML parse) and careful
   manual review, not an actual compile. First real compile signal is
   always the next GitHub Actions run after push.
+- Media3 API surface used in Batch 9 (`FrameDropEffect
+  .createDefaultFrameDropEffect`, `ScaleAndRotateTransformation
+  .Builder().setScale(x, y)`) was verified against public docs/real-world
+  usage examples via web search rather than a local compile — same
+  "structural checks + review, not a real compile" caveat as always
+  applies; treat the next CI run as the actual first signal.
+

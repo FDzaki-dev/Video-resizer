@@ -1,6 +1,7 @@
 FILE_MANIFEST.txt — Video Resizer
-Generated: Batch 6. Regenerate/update this file whenever files are added,
-removed, or renamed — it should always match `find . -type f` for real.
+Generated: Batch 6, last updated Batch 9. Regenerate/update this file
+whenever files are added, removed, or renamed — it should always match
+`find . -type f` for real.
 Legend: [PROTECTED] = edit-parsial-only per user preferences; deleting or
 rewriting wholesale requires explicit user permission first.
 
@@ -18,21 +19,23 @@ ROOT
   FILE_MANIFEST.txt                        this file
 
 app/
-  build.gradle.kts                         [PROTECTED] app module: deps, signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false
+  build.gradle.kts                         [PROTECTED] app module: deps (media3 1.4.1 since Batch 9), signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false
   proguard-rules.pro                       R8 rules (inactive while isMinifyEnabled=false)
 
 app/src/main/
   AndroidManifest.xml                      [PROTECTED] android:name=".VideoResizerApp" (Batch 2), permissions, activity decl
 
 app/src/main/java/com/example/videoresizer/
-  MainActivity.kt                          [PROTECTED — MainActivity] all 3 screens (Resizer/Studio/Batch), Compose UI, theme picker
+  MainActivity.kt                          [PROTECTED — MainActivity] all 4 screens (Resizer/Studio/Batch/GIF, GIF screen new in Batch 9), Compose UI, theme picker
   VideoResizerApp.kt                       [PROTECTED — Application] installs CrashLogger.install() in onCreate (Batch 2)
   CrashLogger.kt                           uncaught-exception handler → MediaStore Documents/VideoResizer/logs/, FIFO 50 (Batch 2)
-  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay (shared buildImageOverlay, Batch 8)
+  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay, flip/frame-rate/target-size (Batch 9)
+  GifEncoder.kt                            (new, Batch 9) dependency-free GIF89a + LZW encoder
+  GifExporter.kt                           (new, Batch 9) frame extraction + palette quantization + GIF orchestration, used by GifScreen
   ExportForegroundService.kt               foreground service wrapping VideoResizer for long exports
   FilmstripExtractor.kt                    thumbnail filmstrip generation for trim UI
-  PublicMovieExporter.kt                   publishes finished videos to Movies/ via MediaStore (own-file insert, no legacy permission)
-  VideoHistoryStore.kt                     Studio screen's history persistence (incl. caption fields, Batch 8)
+  PublicMovieExporter.kt                   publishes finished videos to Movies/ via MediaStore + GIFs to Pictures/ (publishImage, Batch 9)
+  VideoHistoryStore.kt                     Studio screen's history persistence (incl. caption fields Batch 8, flip/frameRate fields Batch 9)
   SocialPreset.kt                          social-media aspect ratio/bitrate presets (Instagram/TikTok/etc.)
 
 app/src/main/java/com/example/videoresizer/ui/theme/
@@ -45,7 +48,7 @@ app/src/main/res/
   values-night/themes.xml                       dark-mode system theme resource
   drawable/ic_launcher*.xml                      launcher icon (vector)
   mipmap-anydpi-v26/ic_launcher.xml              adaptive icon wrapper
-  xml/backup_rules.xml, data_extraction_rules.xml, file_paths.xml   backup/FileProvider config
+  xml/backup_rules.xml, data_extraction_rules.xml, file_paths.xml   backup/FileProvider config (file_paths.xml's cache-path already covers GifExporter's cache output, no change needed Batch 9)
 
 NOT PRESENT (do not assume these exist)
   No gradlew / gradlew.bat / gradle-wrapper.jar — CI installs Gradle 8.7

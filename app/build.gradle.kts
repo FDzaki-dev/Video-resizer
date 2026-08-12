@@ -29,7 +29,7 @@ android {
         // is the literal .github/workflows/build.yml's "Locate APK" step
         // greps for, so keep this exact `val name = "..."` shape if it's
         // ever touched again.
-        val semanticVersionName = "1.13"
+        val semanticVersionName = "1.14"
         // versionName itself is now fully dynamic too (Batch 8): appends
         // "-build<n>" using the same VERSION_CODE_OVERRIDE env var
         // versionCode reads above, so a device's Settings > App info shows
@@ -120,11 +120,17 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // Media3 Transformer for actual video resizing / re-encoding
-    implementation("androidx.media3:media3-transformer:1.3.1")
-    implementation("androidx.media3:media3-effect:1.3.1")
-    implementation("androidx.media3:media3-common:1.3.1")
-    implementation("androidx.media3:media3-exoplayer:1.3.1")
-    implementation("androidx.media3:media3-ui:1.3.1")
+    // BUMP (Batch 9): 1.3.1 -> 1.4.1, needed for androidx.media3.effect.FrameDropEffect
+    // (frame-rate control feature — not present in 1.3.1). Deliberately NOT
+    // bumped past 1.6.0: that release flips the OverlaySettings anchor sign
+    // convention (see WatermarkPosition doc comment in VideoResizer.kt),
+    // which would silently break watermark/caption placement. 1.4.1 is the
+    // first stable release with FrameDropEffect and predates that change.
+    implementation("androidx.media3:media3-transformer:1.4.1")
+    implementation("androidx.media3:media3-effect:1.4.1")
+    implementation("androidx.media3:media3-common:1.4.1")
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
 
     // Guava — explicit because ImmutableList is referenced transitively by
     // Media3's OverlayEffect API (used for the watermark feature). Likely

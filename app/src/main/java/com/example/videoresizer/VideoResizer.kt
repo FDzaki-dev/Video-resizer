@@ -9,6 +9,7 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.FrameDropEffect
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.OverlaySettings
 import androidx.media3.effect.Presentation
@@ -130,6 +131,41 @@ enum class WatermarkPosition(val label: String) {
     }
 }
 
+/**
+ * Mirrors the output horizontally/vertically. Independent of [RotationOption]
+ * — both end up folded into the same [ScaleAndRotateTransformation] in
+ * [VideoResizer.resizeInternal] since that builder accepts scale and
+ * rotation together, rather than adding a second Effect entry.
+ */
+enum class FlipOption(val label: String) {
+    NONE("Tidak ada"),
+    HORIZONTAL("Horizontal"),
+    VERTICAL("Vertikal");
+
+    companion object {
+        val ENTRIES: List<FlipOption> = values().toList()
+    }
+}
+
+/**
+ * Target output frame rate. ORIGINAL leaves the source's own frame rate
+ * untouched (identical behavior to before this feature existed). Backed by
+ * [androidx.media3.effect.FrameDropEffect.createDefaultFrameDropEffect],
+ * which decides per-frame whether to keep or drop it purely from
+ * presentation timestamps — it does not need to be told the *source*'s
+ * frame rate up front.
+ */
+enum class FrameRateOption(val label: String, val fps: Int) {
+    ORIGINAL("Original", 0),
+    FPS_24("24 fps", 24),
+    FPS_30("30 fps", 30),
+    FPS_60("60 fps", 60);
+
+    companion object {
+        val ENTRIES: List<FrameRateOption> = values().toList()
+    }
+}
+
 data class ResizeRequest(
     val sourceUri: Uri,
     val outputFile: File,
@@ -160,7 +196,11 @@ data class ResizeRequest(
     /** Optional short caption burned into the output as a static text overlay (white text, black outline). Null/blank = no caption. */
     val captionText: String? = null,
     /** Reuses [WatermarkPosition] rather than a separate enum — same five anchor points work fine for a caption too. */
-    val captionPosition: WatermarkPosition = WatermarkPosition.BOTTOM_RIGHT
+    val captionPosition: WatermarkPosition = WatermarkPosition.BOTTOM_RIGHT,
+    /** Mirror the output on this axis. NONE = no flip (old behavior). */
+    val flip: FlipOption = FlipOption.NONE,
+    /** Target output frame rate. ORIGINAL = keep the source's frame rate (old behavior). */
+    val frameRate: FrameRateOption = FrameRateOption.ORIGINAL
 )
 
 sealed class ResizeResult {
@@ -231,10 +271,19 @@ class VideoResizer(private val context: Context) {
         }
         presentation?.let { videoEffects.add(it) }
 
-        if (request.rotation != RotationOption.NONE) {
+        // Rotation + flip share a single GL transform matrix, so both fold
+        // into one ScaleAndRotateTransformation instead of two separate
+        // Effect entries — same one-pass idea as Presentation above handling
+        // crop/stretch together. scaleX/scaleY of -1 mirrors that axis; a
+        // flip is applied even when rotation is NONE, so the condition below
+        // checks both instead of gating flip on rotation being set.
+        if (request.rotation != RotationOption.NONE || request.flip != FlipOption.NONE) {
+            val scaleX = if (request.flip == FlipOption.HORIZONTAL) -1f else 1f
+            val scaleY = if (request.flip == FlipOption.VERTICAL) -1f else 1f
             videoEffects.add(
                 ScaleAndRotateTransformation.Builder()
                     .setRotationDegrees(request.rotation.degrees)
+                    .setScale(scaleX, scaleY)
                     .build()
             )
         }
@@ -259,6 +308,16 @@ class VideoResizer(private val context: Context) {
         val captionText = request.captionText?.trim()
         if (!captionText.isNullOrEmpty()) {
             videoEffects.add(buildCaptionOverlay(request, captionText))
+        }
+
+        // Frame rate: FrameDropEffect.createDefaultFrameDropEffect only
+        // needs the *target* fps — it decides per-frame whether to keep or
+        // drop based on presentation timestamps, so no separate "read the
+        // source's frame rate first" step is needed here. Added last so it
+        // operates on the same already-cropped/rotated/watermarked stream as
+        // every other effect above.
+        if (request.frameRate != FrameRateOption.ORIGINAL) {
+            videoEffects.add(FrameDropEffect.createDefaultFrameDropEffect(request.frameRate.fps.toFloat()))
         }
 
         var mediaItemBuilder = MediaItem.Builder().setUri(request.sourceUri)
@@ -522,6 +581,29 @@ class VideoResizer(private val context: Context) {
             val totalBitsPerSecond = (videoBitrateBps + audioBitrateBps).toLong()
             val seconds = durationMs / 1000.0
             return (totalBitsPerSecond * seconds / 8.0).toLong()
+        }
+
+        /**
+         * Inverse of [estimateOutputSizeBytes]: given a desired total output
+         * file size, solves for the video bitrate (kbps) that would roughly
+         * produce it over [durationMs]. Backs the "Ukuran target (MB)"
+         * quality mode in the UI — the caller computes this once and feeds
+         * the result back in as an ordinary QualityOption.CUSTOM +
+         * customBitrateKbps request, so the export pipeline itself needs no
+         * separate "target size" code path at all.
+         *
+         * Returns null when there's no valid video bitrate that fits: a
+         * non-positive size/duration, or a target so small the assumed
+         * 128kbps audio track alone would already exceed it.
+         */
+        fun requiredBitrateKbpsForTargetSize(targetSizeMb: Double, durationMs: Long, muteAudio: Boolean): Int? {
+            if (targetSizeMb <= 0.0 || durationMs <= 0) return null
+            val audioBitrateBps = if (muteAudio) 0 else 128_000
+            val seconds = durationMs / 1000.0
+            val totalBitsPerSecond = (targetSizeMb * 1024.0 * 1024.0 * 8.0) / seconds
+            val videoBitrateBps = totalBitsPerSecond - audioBitrateBps
+            if (videoBitrateBps <= 0) return null
+            return (videoBitrateBps / 1000.0).toInt().coerceIn(MIN_BITRATE_KBPS, MAX_BITRATE_KBPS)
         }
     }
 }
