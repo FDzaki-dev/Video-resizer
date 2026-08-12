@@ -162,7 +162,12 @@ object GifExporter {
                 val b = p and 0xFF
                 val bucket = ((r shr 3) shl 10) or ((g shr 3) shl 5) or (b shr 3)
                 val sums = buckets.getOrPut(bucket) { LongArray(4) }
-                sums[0] += r; sums[1] += g; sums[2] += b; sums[3] += 1
+                // FIX (CI Batch 9 build failure): LongArray element += Int
+                // doesn't compile — Kotlin has no implicit Int->Long
+                // widening, so `sums[0] += r` fails indexed-assignment
+                // overload resolution ("No set method providing array
+                // access"). Explicit .toLong() on the RHS resolves it.
+                sums[0] += r.toLong(); sums[1] += g.toLong(); sums[2] += b.toLong(); sums[3] += 1L
                 i += stride
             }
         }

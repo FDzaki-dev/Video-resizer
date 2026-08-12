@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Batch 10: Fix CI build failure (GifExporter.kt) + failure-log artifact
+
+- **Bug fix (real compile error, not a style issue)**: `GifExporter.kt:165`
+  — `sums[0] += r` where `sums` is a `LongArray` and `r`/`g`/`b` are `Int`
+  failed to compile: `e: No set method providing array access`. Root
+  cause: Kotlin has no implicit `Int` → `Long` widening, so the indexed
+  `+=` desugaring to `sums.set(0, sums.get(0) + r)` can't resolve. Fixed
+  with explicit `.toLong()` on each RHS (`r.toLong()`, `1L`, etc.). Found
+  from the user-supplied Batch 9 CI failure log
+  (`:app:compileReleaseKotlin FAILED`) — first real compiler signal on
+  Batch 9's GIF code, exactly the kind of thing the sandbox's
+  structural-checks-only verification can't catch.
+- **New: failure-log artifact** (`.github/workflows/build.yml`,
+  `[PROTECTED]`) — "Build release APK" now pipes its output through `tee
+  build-output.log` (GitHub Actions' default bash runs with `pipefail`, so
+  a failing `gradle` still fails the step through the pipe). Two new
+  `if: failure()` steps follow: one computes a
+  `log_fail_<version>_<run_number>` name from `semanticVersionName` +
+  `$GITHUB_RUN_NUMBER` (falls back to "unknown" if the grep comes up
+  empty, e.g. checkout itself failed), the other uploads
+  `build-output.log` plus any Gradle/lint report files under that name via
+  `actions/upload-artifact@v4`. Only runs when an earlier step in the job
+  failed — a normal successful build produces no extra artifact.
+
 ## Unreleased — Batch 9 (Atomic): Video-ke-GIF, Flip/Frame Rate, Compress by Target Size
 
 Atomic change (not split across multiple batches) because all three features

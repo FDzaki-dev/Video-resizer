@@ -44,10 +44,41 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build release APK
+        id: build
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           VERSION_CODE_OVERRIDE: ${{ github.run_number }}
-        run: gradle assembleRelease --stacktrace --parallel --build-cache
+        # Piped through `tee` so the full Gradle stdout/stderr is also saved
+        # to a file, not just streamed to the Actions UI — that file is what
+        # "Upload failure logs" below packages up. GitHub Actions' default
+        # bash invocation runs with `pipefail`, so a failing `gradle` still
+        # fails this step (and the job) even through the pipe.
+        run: gradle assembleRelease --stacktrace --parallel --build-cache 2>&1 | tee build-output.log
+
+      - name: Prepare failure log name
+        if: failure()
+        id: failinfo
+        run: |
+          VERSION_NAME=$(grep -m1 'semanticVersionName = ' app/build.gradle.kts | sed -E 's/.*semanticVersionName = "([^"]+)".*/\1/')
+          if [ -z "$VERSION_NAME" ]; then VERSION_NAME="unknown"; fi
+          echo "log_name=log_fail_${VERSION_NAME}_${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      # Failed-build counterpart to "Upload APK artifact" below: whenever any
+      # earlier step in this job fails (compile error, signing error, etc.),
+      # this uploads the captured Gradle output plus any Gradle/lint report
+      # files as a downloadable artifact named log_fail_<version>_<run
+      # number> — so diagnosing a failure doesn't require GitHub's separate
+      # "download log archive" UI export.
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.failinfo.outputs.log_name }}
+          path: |
+            build-output.log
+            **/build/reports/**
+            app/build/outputs/logs/**
+          if-no-files-found: warn
 
       - name: Locate APK
         id: apk

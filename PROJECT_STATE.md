@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 9**. This is the first-read file per the context
+Snapshot as of **Batch 10**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -19,6 +19,12 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 10** — Fixed the real `:app:compileReleaseKotlin` failure Batch 9
+  shipped (`GifExporter.kt` LongArray `+=` Int type mismatch — see
+  CHANGELOG), plus a `log_fail_<version>_<run_number>` GitHub Actions
+  artifact uploaded automatically whenever a build fails (captured Gradle
+  output + reports), so future failures don't need a manual "download log
+  archive" round-trip to diagnose.
 - **Batch 9 (Atomic)** — Video ke GIF (`GifEncoder.kt`/`GifExporter.kt`,
   new files, own from-spec GIF89a/LZW encoder, no Transformer involved),
   Flip/mirror + Frame Rate control in the main Resizer screen (Media3
@@ -79,6 +85,11 @@ architecture/quirk notes live in README.md.
   the place to swap in something like median-cut/NeuQuant.
 
 ## Known pending items (not yet actioned)
+- 🟡 **Batch 10 fix not yet CI-verified**: the `GifExporter.kt` type-mismatch
+  fix and the new failure-log workflow step are both structurally checked
+  only (brace/paren balance + YAML parse), same as every batch — push and
+  check the next Actions run is genuinely green before treating Batch 9's
+  GIF feature as confirmed-working.
 - 🟡 Manual-only cleanup: the pre-Batch-5 duplicated `v1.13` GitHub Release
   (old tag collision) — needs `gh release delete v1.13 -y` on the user's
   end; not something a code batch can retroactively fix.
