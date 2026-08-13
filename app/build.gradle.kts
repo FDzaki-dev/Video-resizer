@@ -29,7 +29,7 @@ android {
         // is the literal .github/workflows/build.yml's "Locate APK" step
         // greps for, so keep this exact `val name = "..."` shape if it's
         // ever touched again.
-        val semanticVersionName = "1.14"
+        val semanticVersionName = "1.15"
         // versionName itself is now fully dynamic too (Batch 8): appends
         // "-build<n>" using the same VERSION_CODE_OVERRIDE env var
         // versionCode reads above, so a device's Settings > App info shows

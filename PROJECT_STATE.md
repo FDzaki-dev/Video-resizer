@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 10**. This is the first-read file per the context
+Snapshot as of **Batch 11**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -19,6 +19,12 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 11** — Debug/polish pass over Batch 9/10's GIF + target-size +
+  Studio history code (no new features): GIF playback-delay drift fix,
+  corrupt-frame guard, a perf fix in GIF quantization, a target-size-clamp
+  warning in the dialog, flip/frame-rate now shown in Studio history
+  cards, and three `!!` force-unwraps in `GifScreen` rewritten to match
+  the file's existing convention.
 - **Batch 10** — Fixed the real `:app:compileReleaseKotlin` failure Batch 9
   shipped (`GifExporter.kt` LongArray `+=` Int type mismatch — see
   CHANGELOG), plus a `log_fail_<version>_<run_number>` GitHub Actions
@@ -85,6 +91,9 @@ architecture/quirk notes live in README.md.
   the place to swap in something like median-cut/NeuQuant.
 
 ## Known pending items (not yet actioned)
+- 🟡 **Batch 11 fixes not yet CI-verified** — same caveat as every batch:
+  structural checks + manual review only, push and confirm the next
+  Actions run is green.
 - 🟡 **Batch 10 fix not yet CI-verified**: the `GifExporter.kt` type-mismatch
   fix and the new failure-log workflow step are both structurally checked
   only (brace/paren balance + YAML parse), same as every batch — push and

@@ -56,16 +56,27 @@ object GifExporter {
         val clipMs = endMs - startMs
         val frameInterval = 1000.0 / fps
         val frameCount = (clipMs / frameInterval).toInt().coerceIn(1, MAX_FRAMES)
+        // Real spacing between extracted frames — matches `frameInterval`
+        // exactly unless MAX_FRAMES capped frameCount below what `fps`
+        // alone would have asked for (a very long clip / high fps
+        // combination). The UI disables the export button before this can
+        // happen in practice, but computing delayCentiseconds from this
+        // instead of the raw `fps` keeps GifExporter itself correct even
+        // if called with a frameCount-capping combination some other way.
+        val actualIntervalMs = clipMs.toDouble() / frameCount
 
         val bitmaps = ArrayList<Bitmap>(frameCount)
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, sourceUri)
-            val actualInterval = clipMs.toDouble() / frameCount
             for (i in 0 until frameCount) {
-                val timeMs = startMs + (i * actualInterval).toLong()
+                val timeMs = startMs + (i * actualIntervalMs).toLong()
                 val frame = retriever.getFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST)
                     ?: continue
+                if (frame.width <= 0 || frame.height <= 0) {
+                    frame.recycle()
+                    continue
+                }
                 val scale = targetWidth.toFloat() / frame.width
                 val targetHeight = (frame.height * scale).toInt().coerceAtLeast(1)
                 val scaled = Bitmap.createScaledBitmap(frame, targetWidth, targetHeight, true)
@@ -98,15 +109,23 @@ object GifExporter {
         }
 
         val palette = buildPalette(consistentBitmaps)
+        // Split once, shared across every frame — quantizeFrame no longer
+        // rebuilds these three arrays per call (previously up to
+        // MAX_FRAMES=200 redundant IntArray(≤256) allocations for data
+        // that's identical every time, since the palette itself is fixed
+        // for the whole clip).
+        val paletteR = IntArray(palette.size) { (palette[it] shr 16) and 0xFF }
+        val paletteG = IntArray(palette.size) { (palette[it] shr 8) and 0xFF }
+        val paletteB = IntArray(palette.size) { palette[it] and 0xFF }
 
         val indexedFrames = ArrayList<ByteArray>(consistentBitmaps.size)
         for ((i, bmp) in consistentBitmaps.withIndex()) {
-            indexedFrames.add(quantizeFrame(bmp, palette, width, height))
+            indexedFrames.add(quantizeFrame(bmp, paletteR, paletteG, paletteB, width, height))
             bmp.recycle()
             onProgress((40 + ((i + 1) * 50) / consistentBitmaps.size).coerceIn(40, 90))
         }
 
-        val delayCentiseconds = max(2, (100.0 / fps).toInt())
+        val delayCentiseconds = max(2, (actualIntervalMs / 10.0).toInt())
 
         return try {
             FileOutputStream(outputFile).use { out ->
@@ -185,15 +204,11 @@ object GifExporter {
         }
     }
 
-    /** Maps every pixel of [bmp] to the nearest color in [palette] by squared RGB distance. */
-    private fun quantizeFrame(bmp: Bitmap, palette: IntArray, width: Int, height: Int): ByteArray {
+    /** Maps every pixel of [bmp] to the nearest color in the (pre-split) palette by squared RGB distance. */
+    private fun quantizeFrame(bmp: Bitmap, paletteR: IntArray, paletteG: IntArray, paletteB: IntArray, width: Int, height: Int): ByteArray {
         val pixels = IntArray(width * height)
         bmp.getPixels(pixels, 0, width, 0, 0, width, height)
         val result = ByteArray(pixels.size)
-
-        val paletteR = IntArray(palette.size) { (palette[it] shr 16) and 0xFF }
-        val paletteG = IntArray(palette.size) { (palette[it] shr 8) and 0xFF }
-        val paletteB = IntArray(palette.size) { palette[it] and 0xFF }
 
         for (i in pixels.indices) {
             val p = pixels[i]
@@ -202,7 +217,7 @@ object GifExporter {
             val b = p and 0xFF
             var bestIdx = 0
             var bestDist = Int.MAX_VALUE
-            for (j in palette.indices) {
+            for (j in paletteR.indices) {
                 val dr = r - paletteR[j]
                 val dg = g - paletteG[j]
                 val db = b - paletteB[j]

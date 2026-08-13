@@ -2718,6 +2718,14 @@ private fun TargetSizeDialog(
     } else {
         null
     }
+    // requiredBitrateKbpsForTargetSize clamps its result to
+    // MIN_BITRATE_KBPS..MAX_BITRATE_KBPS (same floor/ceiling
+    // estimateOutputSizeBytes uses) so a bad target can't produce an
+    // unusable file — but that means an extreme target (e.g. 1MB for a
+    // 10-minute clip) silently returns a *bigger* bitrate than requested,
+    // so the real output won't actually land near the size the user typed.
+    // Surface that instead of quietly showing a number that looks precise.
+    val isClamped = computedKbps == VideoResizer.MIN_BITRATE_KBPS || computedKbps == VideoResizer.MAX_BITRATE_KBPS
     val error = when {
         sizeText.isEmpty() -> null
         sizeValue == null || sizeValue <= 0.0 -> "Tidak valid"
@@ -2752,6 +2760,10 @@ private fun TargetSizeDialog(
                     supportingText = {
                         when {
                             error != null -> Text(error)
+                            isClamped && computedKbps == VideoResizer.MIN_BITRATE_KBPS ->
+                                Text("≈ $computedKbps kbps (minimum) — ukuran target terlalu kecil untuk durasi klip ini, hasil akhir akan lebih besar dari target.")
+                            isClamped ->
+                                Text("≈ $computedKbps kbps (maksimum) — ukuran target ini sudah di atas kualitas tertinggi yang didukung.")
                             computedKbps != null -> Text("≈ $computedKbps kbps untuk durasi klip yang dipilih saat ini.")
                             else -> Text("Contoh: 16 untuk target upload WhatsApp Status/Story.")
                         }
@@ -3020,6 +3032,32 @@ private fun StudioEntryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
+                }
+                if (!entry.captionText.isNullOrBlank()) {
+                    Text(
+                        "Caption aktif",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                run {
+                    // Polish (Batch 11): flip/frame-rate weren't shown anywhere
+                    // in this history card before, even though they're saved
+                    // per-entry since Batch 9 — matches how rotation/quality/
+                    // watermark/caption already surface here.
+                    val flipOpt = FlipOption.ENTRIES.firstOrNull { it.name == entry.flipName } ?: FlipOption.NONE
+                    val frameRateOpt = FrameRateOption.ENTRIES.firstOrNull { it.name == entry.frameRateName } ?: FrameRateOption.ORIGINAL
+                    val extras = listOfNotNull(
+                        if (flipOpt != FlipOption.NONE) "Flip ${flipOpt.label}" else null,
+                        if (frameRateOpt != FrameRateOption.ORIGINAL) frameRateOpt.label else null
+                    )
+                    if (extras.isNotEmpty()) {
+                        Text(
+                            extras.joinToString(" • "),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
                 Text(
                     "Durasi: ${formatSeconds(entry.trimEndMs - entry.trimStartMs)}" + if (entry.muteAudio) " • Tanpa audio" else "",
@@ -3362,7 +3400,12 @@ private fun GifScreen(onBack: () -> Unit) {
                     onPickClick = { pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
                 )
             } else {
-                val currentUri = selectedUri!!
+                // Local val capture instead of !!, same reasoning as
+                // ResizerScreen's identical comment above: selectedUri is
+                // Compose mutable state (custom getter), so Kotlin can't
+                // smart-cast it from the null-check in the `if` above.
+                val currentUri = selectedUri
+                if (currentUri != null) {
                 VideoEditorPreview(
                     uri = currentUri,
                     sourceWidth = sourceWidth,
@@ -3508,12 +3551,20 @@ private fun GifScreen(onBack: () -> Unit) {
                 }
 
                 if (resultFile != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = { shareGifFile(context, resultFile!!) }) { Text("Share") }
-                        if (galleryUri != null) {
-                            OutlinedButton(onClick = { openGifInGallery(context, galleryUri!!) }) { Text("Buka di Galeri") }
+                    // Local val capture instead of !!, same convention as
+                    // the rest of this file (see the comment on
+                    // `currentUri` above).
+                    val savedGifFile = resultFile
+                    val savedGalleryUri = galleryUri
+                    if (savedGifFile != null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = { shareGifFile(context, savedGifFile) }) { Text("Share") }
+                            if (savedGalleryUri != null) {
+                                OutlinedButton(onClick = { openGifInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
+                            }
                         }
                     }
+                }
                 }
             }
         }

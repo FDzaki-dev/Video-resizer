@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased — Batch 11: Debug/polish pass across GIF, target-size, and Studio history
+
+Not a new feature — a review pass over everything Batch 9/10 touched
+(user asked to "fokus debugging/polish semua fitur" after the green
+build), looking for real bugs and rough edges the sandbox's structural
+checks alone couldn't have caught.
+
+- **Fixed**: GIF playback delay could drift from the actually-extracted
+  frame spacing (`GifExporter.export`) — `delayCentiseconds` was computed
+  from the *requested* fps, but the real spacing between frames
+  (`actualIntervalMs`) only equals `1000/fps` when `MAX_FRAMES` isn't hit;
+  for a clip long/fast enough to hit that cap, the GIF would've played
+  back faster than the source. Now derives the delay from
+  `actualIntervalMs` directly, so it's correct in both cases. (Currently
+  unreachable in practice — the GIF screen's own frame-count estimate
+  disables the button before this cap is hit — but `GifExporter` is a
+  general-purpose object, not something that should only be correct when
+  called through that one screen.)
+- **Fixed**: `GifExporter` skipped a `frame.width <= 0`/`frame.height <= 0`
+  guard — a corrupt/unreadable frame from `getFrameAtTime` would have
+  produced `Infinity`/`NaN` math feeding `Bitmap.createScaledBitmap` and
+  likely crashed the export. Now such frames are recycled and skipped,
+  same as an outright-null frame already was.
+- **Perf**: `GifExporter.quantizeFrame` rebuilt the palette's R/G/B split
+  arrays on every single frame call, even though the palette is identical
+  for the whole clip — up to `MAX_FRAMES` (200) redundant allocations of
+  the same data. Split once in `export()` now, passed down instead.
+- **UX fix**: `requiredBitrateKbpsForTargetSize` clamps its result to
+  `MIN_BITRATE_KBPS..MAX_BITRATE_KBPS` (same floor/ceiling
+  `estimateOutputSizeBytes` uses) so a bad target can't produce an
+  unusable file — but an extreme target (e.g. 1MB for a 10-minute clip)
+  silently returned a bitrate bigger than what the size implied, with the
+  dialog showing "≈ X kbps" as if it were exact. `TargetSizeDialog` now
+  detects the clamp and says so explicitly instead of quietly showing a
+  number that looks precise but won't hit the target.
+- **Consistency fix**: Studio history cards showed rotation/quality/
+  watermark/caption but never flip or frame rate, even though both have
+  been saved per-entry since Batch 9 — same blind spot as caption briefly
+  was after Batch 8. Added a "Flip Horizontal • 30 fps"-style line,
+  same pattern as the existing "Watermark aktif"/"Caption aktif" lines,
+  only shown when either is non-default.
+- **Code-hygiene fix**: `GifScreen` (new in Batch 9) had introduced three
+  `!!` force-unwraps (`selectedUri!!`, `resultFile!!`, `galleryUri!!`),
+  inconsistent with this file's established "local val capture instead of
+  `!!`" convention (see the comments at `currentUri` in `ResizerScreen`,
+  predating this batch) and with Batch 2's explicit goal of having none
+  left in `MainActivity.kt`/`VideoResizer.kt`. Rewritten to match.
+
 ## Unreleased — Batch 10: Fix CI build failure (GifExporter.kt) + failure-log artifact
 
 - **Bug fix (real compile error, not a style issue)**: `GifExporter.kt:165`
