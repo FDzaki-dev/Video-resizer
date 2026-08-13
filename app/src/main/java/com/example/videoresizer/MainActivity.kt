@@ -2381,7 +2381,25 @@ private fun VideoEditorPreview(
                 }
             }
 
-            Box(modifier = Modifier.fillMaxWidth()) {
+            // FIX (asymmetric edges, reported by user): the trim handles
+            // below are drawn as SIBLINGS of the filmstrip Row in this Box,
+            // not children of it — so the filmstrip's own `.clip(...)` on
+            // its Row never applied to them. Each handle's invisible 48dp
+            // touch target is wider than its visible bar, and at the two
+            // extremes (fraction 0f / 1f) that made the *visible* bar hang
+            // ~8dp past the filmstrip's left/right edge — a lopsided-looking
+            // sliver outside the rounded corners on both sides, worse
+            // whenever the trim wasn't already at the very start/end.
+            // Clipping this whole Box (filmstrip + dim overlays + selection
+            // frame + both handles together) to one shared rounded shape
+            // makes every layer stop flush at the exact same edge, so nothing
+            // in the stack can overhang past what's visually the track.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(trackHeight)
+                    .clip(RoundedCornerShape(10.dp))
+            ) {
                 if (filmstrip.isNotEmpty()) {
                     Row(
                         modifier = Modifier

@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 13**. This is the first-read file per the context
+Snapshot as of **Batch 13b**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -8,10 +8,10 @@ architecture/quirk notes live in README.md.
 
 ## Current version
 - `versionName`/`versionCode` both dynamic since Batch 8: base semantic
-  label **`"1.17"`** (bumped from `1.16` this batch — `val
+  label **`"1.18"`** (bumped from `1.17` this batch — `val
   semanticVersionName` in `app/build.gradle.kts`, bump manually per feature
   batch) with `-build<n>` appended in CI; `versionCode` =
-  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.17` / `1013` for
+  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.18` / `1013` for
   any non-CI build.
 - ⚠️ **Version-history gap noticed this batch**: the uploaded project's
   `app/build.gradle.kts` was already at `1.16` — a full minor ahead of the
@@ -26,6 +26,14 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 13b** — Follow-up to Batch 13's flagged "UI asimetris" item:
+  user's clarification ("semua bagian yang gak kelihatan simetris") wasn't
+  specific enough to target, so rather than keep asking, shipped the one
+  concrete issue found on review — `VideoEditorPreview`'s trim handles
+  visually overhanging the filmstrip's rounded edges by ~8dp at the two
+  trim extremes, now fixed by clipping the whole filmstrip+handles Box to
+  one shared shape. Still open if this isn't what the user meant — see
+  pending items.
 - **Batch 13** — New `VideoPickerScreen.kt`: full-screen in-app video
   picker (MediaStore-backed, Videos/Folders tabs, list rows with
   thumbnail/name/duration/resolution/date/size, sort menu, explicit
@@ -117,17 +125,20 @@ architecture/quirk notes live in README.md.
   that's new scope, not an extension of the existing single-pick screen.
 
 ## Known pending items (not yet actioned)
-- 🔴 **"UI asimetris" on the trim editor — needs the user to point at the
-  specific element.** Reported against `VideoEditorPreview` (the
-  play-preview + filmstrip trim card). Reviewed the composable's layout
-  code closely — player box (fixed 220dp) → time-label row → filmstrip/
-  trim-handle box (fixed `trackHeight`) → details row, all separated by
-  plain `Arrangement.spacedBy(12.dp)` with no `weight`/`fillMaxHeight`
-  anywhere that could explain a large empty gap — and couldn't identify a
-  concrete structural cause with high confidence. Asked the user directly
-  which element/region looks off rather than shipping a guessed fix that
-  might be a no-op. **Next batch: read their answer here first.**
-- 🟡 **Batch 13 changes not yet CI-verified** — same caveat as every
+- 🟡 **"UI asimetris" on the trim editor — one concrete cause fixed
+  (Batch 13b), may not be the whole story.** User's clarification was
+  "semua bagian yang gak kelihatan simetris" (not specific enough to
+  target further), so rather than keep asking, Batch 13b shipped the one
+  issue actually found on review: the trim handles overhanging the
+  filmstrip's rounded edges by ~8dp at the trim extremes — now fixed via
+  a shared clip on the filmstrip+handles Box. No other structural cause
+  was found in `VideoEditorPreview` (player box/time-labels/details row
+  all plain `spacedBy(12.dp)`, no `weight`/`fillMaxHeight`). **If this
+  wasn't it: next useful input is a marked-up screenshot** (arrow/circle
+  on the actual element) rather than another verbal description — visual
+  layout bugs are hard to pin down blind, and two rounds of guessing
+  without one risks burning batches on a no-op.
+- 🟡 **Batch 13/13b changes not yet CI-verified** — same caveat as every
   batch: structural checks (brace/paren balance) + manual review only,
   push and confirm the next Actions run is green.
 - 🟡 Manual-only cleanup: the pre-Batch-5 duplicated `v1.13` GitHub Release

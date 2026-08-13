@@ -59,6 +59,34 @@ asked for a clear cancel affordance for a wrong tap.
   guessed fix — see PROJECT_STATE.md's pending items.
 - `semanticVersionName` bumped `1.16` → `1.17` (app/build.gradle.kts).
 
+## Unreleased — Batch 13b: Trim-editor edge-clip fix ("UI asimetris" follow-up)
+
+User's answer to "which part looks asymmetric" was "all the parts that
+don't look symmetric" — not specific enough to point at one thing, so
+rather than keep asking, this batch ships the one concrete, code-level
+issue Batch 13's review actually found and is confident about, instead of
+guessing at layout changes with no way to verify them visually here.
+
+- **`VideoEditorPreview`'s filmstrip/trim-handle `Box` now clips to the
+  same rounded shape as the filmstrip itself** — the two `TrimHandle`s (and
+  the dim overlays / selection frame) are siblings of the filmstrip `Row`
+  in that `Box`, not children of it, so the filmstrip's own
+  `.clip(RoundedCornerShape(10.dp))` never applied to them. Each handle's
+  invisible 48dp touch target is wider than its visible 16dp bar, and at
+  the two extremes (trim start at 0f / trim end at 1f) that let the
+  *visible* bar hang ~8dp past the filmstrip's left/right edge — a
+  lopsided sliver sitting outside the rounded corners on whichever side(s)
+  the trim wasn't already pulled all the way to. Clipping the whole `Box`
+  (filmstrip + overlays + frame + both handles together) to one shared
+  shape makes every layer stop flush at the same edge; nothing in the
+  stack can overhang anymore. Touch/drag behavior is unchanged — `clip`
+  only affects drawing, not the handle's hit-test region.
+- **Still open**: if this wasn't the asymmetry the user meant, the next
+  step is a marked-up screenshot (arrow/circle on the actual element) —
+  see PROJECT_STATE.md's pending items. Not re-guessing further without
+  one, to avoid spending another batch on a possible no-op.
+- `semanticVersionName` bumped `1.17` → `1.18`.
+
 ## Unreleased — Batch 12: Close out Batch 9's two scope cuts (BatchScreen controls, GIF history)
 
 Both of Batch 9's explicitly-deferred items, done together since they're
