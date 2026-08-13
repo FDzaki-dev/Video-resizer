@@ -1,5 +1,67 @@
 # Changelog
 
+## Unreleased — Batch 12: Close out Batch 9's two scope cuts (BatchScreen controls, GIF history)
+
+Both of Batch 9's explicitly-deferred items, done together since they're
+both direct continuations of that same feature — user asked to "tuntaskan
+yang pending+urgent" after confirming the Batch 11 build was green.
+
+- **BatchScreen: Flip/Frame Rate/Target-Size (MB)** — same three controls
+  ResizerScreen already had, now available for the whole queue:
+  - Flip and Frame Rate: identical `OptionSection` chips to ResizerScreen's,
+    new `flip`/`frameRate` state, passed straight through into every
+    item's `ResizeRequest`.
+  - Target-Size (MB) is **not** a single shared bitrate the way
+    ResizerScreen's version is — a batch queue can hold videos of very
+    different lengths, and one bitrate computed from one assumed duration
+    would badly miss the target for anything shorter/longer than that.
+    Instead `targetSizeMb: Double?` just stores the target itself; a new
+    `BatchTargetSizeDialog` (deliberately without ResizerScreen's live
+    "≈ X kbps" preview, since there's no single duration to compute it
+    against here) collects it, and `startBatch()`'s per-item loop — which
+    already probes each item's own duration before building its
+    `ResizeRequest` — solves MB→kbps freshly for *that* item via the same
+    `VideoResizer.requiredBitrateKbpsForTargetSize` ResizerScreen's dialog
+    uses, falling back to `MIN_BITRATE_KBPS` (best effort, not a failure)
+    for the rare item whose duration makes the target impossible.
+  - The Quality chip row and the Social Preset row both now clear
+    `targetSizeMb` when picked, so the three quality-selection paths
+    (preset chips / custom kbps / target size) stay mutually exclusive —
+    same as ResizerScreen's already-existing preset/custom-kbps exclusivity.
+- **GIF exports now save to Studio history** (`VideoHistoryStore.kt` — new
+  `kind`/`gifFps`/`gifWidthPx` fields, `"VIDEO"`/0/0 defaults so entries
+  saved before this batch stay readable; `MainActivity.kt` — GifScreen
+  writes an entry on export success):
+  - `thumbnailPath` deliberately points at the GIF file itself, not a
+    separately-extracted static frame — `BitmapFactory.decodeFile` (what
+    `StudioEntryCard` already uses) reads a GIF's first frame as a plain
+    `Bitmap` with zero extra code, unlike the video path which needs
+    `extractVideoThumbnail` because `MediaMetadataRetriever` can't decode
+    a *video* thumbnail without one.
+  - `StudioEntryCard` now branches its detail line on `entry.kind`: GIF
+    entries show "GIF • Nfps • Wpx" instead of the video-specific
+    aspect/resolution/rotation/quality/watermark/caption/flip/frame-rate
+    lines, since none of those fields apply to a GifExporter output.
+  - "Edit ulang" on a GIF entry reopens `GifScreen` (not `ResizerScreen`)
+    via a new, deliberately separate `GifPrefill` data class — a GIF
+    entry carries none of `PrefillSettings`' resize-specific fields, so
+    routing it through the video prefill path would've reopened the wrong
+    screen with mostly-default settings.
+  - Share/"Buka di Galeri" for a GIF entry now use `shareGifFile`/
+    `shareGifUri` (new)/`openGifInGallery` (`image/gif` mime) instead of
+    the video-mime helpers, via a `entry.kind == "GIF"` branch at the
+    `StudioScreen` call site.
+  - `GifScreen`'s picker-launcher metadata probe and its new prefill
+    effect shared near-identical `MediaMetadataRetriever` code; factored
+    into one local `loadSourceMetadata` suspend fun (same "local suspend
+    fun inside the composable" convention `ResizerScreen`'s own
+    `loadVideoMetadata` already uses) rather than duplicating it a third
+    time.
+- **Not done this batch**: the pre-Batch-5 duplicated `v1.13` GitHub
+  Release still needs a manual `gh release delete v1.13 -y` — not
+  something a code batch can act on, noted again here since it's still
+  the one open item that isn't code.
+
 ## Unreleased — Batch 11: Debug/polish pass across GIF, target-size, and Studio history
 
 Not a new feature — a review pass over everything Batch 9/10 touched

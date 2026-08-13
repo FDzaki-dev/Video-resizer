@@ -178,6 +178,21 @@ private data class PrefillSettings(
     val frameRate: FrameRateOption
 )
 
+/**
+ * GifScreen's counterpart to [PrefillSettings] — deliberately a separate,
+ * much smaller data class rather than reusing/extending PrefillSettings:
+ * GIF export has its own narrower setting set (fps/width, no
+ * resolution/quality/watermark/etc.) and its own screen, so there's no
+ * shared structure worth factoring out beyond the source video identity.
+ */
+private data class GifPrefill(
+    val uri: Uri,
+    val trimStartMs: Long,
+    val trimEndMs: Long,
+    val fps: Int,
+    val targetWidth: Int
+)
+
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun VideoResizerApp(
@@ -186,6 +201,7 @@ private fun VideoResizerApp(
 ) {
     var screen by remember { mutableStateOf(Screen.MAIN) }
     var prefill by remember { mutableStateOf<PrefillSettings?>(null) }
+    var gifPrefill by remember { mutableStateOf<GifPrefill?>(null) }
     var studioMessage by remember { mutableStateOf<String?>(null) }
 
     // BUG FIX: this used to be a `when (screen)` that fully unmounted
@@ -223,13 +239,31 @@ private fun VideoResizerApp(
         }
         if (screen == Screen.GIF) {
             GifScreen(
-                onBack = { screen = Screen.MAIN }
+                onBack = { screen = Screen.MAIN },
+                prefill = gifPrefill,
+                onPrefillConsumed = { gifPrefill = null }
             )
         }
         if (screen == Screen.STUDIO) {
             StudioScreen(
                 onBack = { screen = Screen.MAIN },
                 onEditAgain = { entry ->
+                    if (entry.kind == "GIF") {
+                        // Separate prefill path (see GifPrefill doc comment)
+                        // — a GIF entry has none of the resize-specific
+                        // fields PrefillSettings below reads, so routing it
+                        // through PrefillSettings/Screen.MAIN would reopen
+                        // the wrong screen with mostly-default settings.
+                        gifPrefill = GifPrefill(
+                            uri = Uri.parse(entry.sourceUri),
+                            trimStartMs = entry.trimStartMs,
+                            trimEndMs = entry.trimEndMs,
+                            fps = entry.gifFps.takeIf { it > 0 } ?: 10,
+                            targetWidth = entry.gifWidthPx.takeIf { it > 0 } ?: 360
+                        )
+                        screen = Screen.GIF
+                        return@StudioScreen
+                    }
                     prefill = PrefillSettings(
                         uri = Uri.parse(entry.sourceUri),
                         aspectRatio = AspectRatioOption.ENTRIES.firstOrNull { it.name == entry.aspectRatioName } ?: AspectRatioOption.ORIGINAL,
@@ -1513,6 +1547,12 @@ private fun BatchScreen(onBack: () -> Unit) {
     var resolution by remember { mutableStateOf(ResolutionOption.ORIGINAL) }
     var resizeMode by remember { mutableStateOf(ResizeMode.CROP) }
     var rotation by remember { mutableStateOf(RotationOption.NONE) }
+    // Batch 12: same controls ResizerScreen already has, extended here so
+    // batch jobs aren't limited to a narrower option set than a single
+    // export — see CHANGELOG's Batch 9 "Not done this batch" for why this
+    // was deferred originally.
+    var flip by remember { mutableStateOf(FlipOption.NONE) }
+    var frameRate by remember { mutableStateOf(FrameRateOption.ORIGINAL) }
     var muteAudio by remember { mutableStateOf(false) }
     var showCustomResDialog by remember { mutableStateOf(false) }
     var customWidth by remember { mutableStateOf<Int?>(null) }
@@ -1520,6 +1560,14 @@ private fun BatchScreen(onBack: () -> Unit) {
     var quality by remember { mutableStateOf(QualityOption.ORIGINAL) }
     var showCustomBitrateDialog by remember { mutableStateOf(false) }
     var customBitrateKbps by remember { mutableStateOf<Int?>(null) }
+    // "Ukuran target (MB)" for batch: unlike ResizerScreen's TargetSizeDialog
+    // (one video, one known duration, so MB->kbps can be shown live),
+    // batch items can each have a different duration — so this just stores
+    // the target size itself, and startBatch() below solves MB->kbps
+    // separately for *each* item against that item's own probed duration
+    // right before building its ResizeRequest.
+    var targetSizeMb by remember { mutableStateOf<Double?>(null) }
+    var showTargetSizeDialog by remember { mutableStateOf(false) }
     var watermarkUri by remember { mutableStateOf<Uri?>(null) }
     var watermarkPosition by remember { mutableStateOf(WatermarkPosition.BOTTOM_RIGHT) }
     var watermarkOpacityPercent by remember { mutableFloatStateOf(70f) }
@@ -1656,6 +1704,19 @@ private fun BatchScreen(onBack: () -> Unit) {
 
                 val id = UUID.randomUUID().toString()
                 val thumbDir = File(context.cacheDir, "thumbs").apply { mkdirs() }
+                // Target-size mode resolves per item here, against this
+                // item's own probed `dur` — see targetSizeMb's doc comment
+                // above for why this can't be solved once for the whole
+                // queue. Falls back to MIN_BITRATE_KBPS (best effort) in the
+                // rare case the requested size is impossible for this one
+                // item's duration, rather than failing that item outright.
+                val tsMb = targetSizeMb
+                val effectiveQuality = if (tsMb != null) QualityOption.CUSTOM else quality
+                val effectiveCustomBitrateKbps = if (tsMb != null) {
+                    VideoResizer.requiredBitrateKbpsForTargetSize(tsMb, dur, muteAudio) ?: VideoResizer.MIN_BITRATE_KBPS
+                } else {
+                    customBitrateKbps
+                }
                 val request = ResizeRequest(
                     sourceUri = item.uri,
                     outputFile = File(context.cacheDir, "resized_$id.mp4"),
@@ -1667,11 +1728,13 @@ private fun BatchScreen(onBack: () -> Unit) {
                     trimEndMs = dur,
                     muteAudio = muteAudio,
                     rotation = rotation,
+                    flip = flip,
+                    frameRate = frameRate,
                     resizeMode = resizeMode,
                     customWidth = customWidth,
                     customHeight = customHeight,
-                    quality = quality,
-                    customBitrateKbps = customBitrateKbps,
+                    quality = effectiveQuality,
+                    customBitrateKbps = effectiveCustomBitrateKbps,
                     watermarkUri = watermarkUri,
                     watermarkPosition = watermarkPosition,
                     watermarkOpacityPercent = watermarkOpacityPercent.roundToInt(),
@@ -1729,6 +1792,17 @@ private fun BatchScreen(onBack: () -> Unit) {
                 customBitrateKbps = kbps
                 quality = QualityOption.CUSTOM
                 showCustomBitrateDialog = false
+            }
+        )
+    }
+
+    if (showTargetSizeDialog) {
+        BatchTargetSizeDialog(
+            initialMb = targetSizeMb,
+            onDismiss = { showTargetSizeDialog = false },
+            onSave = { mb ->
+                targetSizeMb = mb
+                showTargetSizeDialog = false
             }
         )
     }
@@ -1902,6 +1976,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                                 customHeight = preset.height
                                 quality = QualityOption.CUSTOM
                                 customBitrateKbps = preset.bitrateKbps
+                                targetSizeMb = null
                             },
                             label = { Text(preset.label) },
                             colors = FilterChipDefaults.filterChipColors(
@@ -1980,7 +2055,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                 )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(QualityOption.ENTRIES) { option ->
-                        val isSelected = option == quality
+                        val isSelected = option == quality && targetSizeMb == null
                         val label = if (option == QualityOption.CUSTOM && customBitrateKbps != null) {
                             "${customBitrateKbps} kbps"
                         } else option.label
@@ -1988,11 +2063,33 @@ private fun BatchScreen(onBack: () -> Unit) {
                             selected = isSelected,
                             onClick = {
                                 selectedSocialPreset = null
+                                targetSizeMb = null
                                 if (option == QualityOption.CUSTOM) showCustomBitrateDialog = true else quality = option
                             },
                             label = { Text(label) }
                         )
                     }
+                    // Not one of QualityOption.ENTRIES, same "second entry
+                    // point into CUSTOM" idea as ResizerScreen's identical
+                    // chip — see targetSizeMb's doc comment above for how
+                    // batch resolves this per item instead of once.
+                    item {
+                        FilterChip(
+                            selected = targetSizeMb != null,
+                            onClick = {
+                                selectedSocialPreset = null
+                                showTargetSizeDialog = true
+                            },
+                            label = { Text(targetSizeMb?.let { "${it} MB" } ?: "Ukuran target (MB)") }
+                        )
+                    }
+                }
+                if (targetSizeMb != null) {
+                    Text(
+                        "Bitrate akan dihitung per video sesuai durasi masing-masing saat batch diproses.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -2002,6 +2099,22 @@ private fun BatchScreen(onBack: () -> Unit) {
                 labelOf = { it.label },
                 selected = rotation,
                 onSelect = { rotation = it }
+            )
+
+            OptionSection(
+                title = "Flip / cermin",
+                options = FlipOption.ENTRIES,
+                labelOf = { it.label },
+                selected = flip,
+                onSelect = { flip = it }
+            )
+
+            OptionSection(
+                title = "Frame rate",
+                options = FrameRateOption.ENTRIES,
+                labelOf = { it.label },
+                selected = frameRate,
+                onSelect = { frameRate = it }
             )
 
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -2792,6 +2905,70 @@ private fun TargetSizeDialog(
     )
 }
 
+/**
+ * BatchScreen's counterpart to [TargetSizeDialog] — deliberately simpler:
+ * no live "≈ X kbps" preview, since a batch queue can hold videos of
+ * different durations and there's no single duration to compute one
+ * against here. Just collects the target MB; startBatch() solves MB->kbps
+ * separately for each item against that item's own duration.
+ */
+@Composable
+private fun BatchTargetSizeDialog(
+    initialMb: Double?,
+    onDismiss: () -> Unit,
+    onSave: (Double) -> Unit
+) {
+    var sizeText by remember { mutableStateOf(initialMb?.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() } ?: "") }
+    val sizeValue = sizeText.toDoubleOrNull()
+    val isValid = sizeValue != null && sizeValue > 0.0
+
+    AlertDialog(
+        onDismissRequest = { /* accidental-dismiss guard, same as the other dialogs in this file */ },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        ),
+        title = { Text("Ukuran Target (MB) — Batch") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .imePadding()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedTextField(
+                    value = sizeText,
+                    onValueChange = { input -> sizeText = input.filter { c -> c.isDigit() || c == '.' }.take(6) },
+                    label = { Text("Ukuran file target per video (MB)") },
+                    singleLine = true,
+                    isError = sizeText.isNotEmpty() && !isValid,
+                    supportingText = {
+                        if (sizeText.isNotEmpty() && !isValid) Text("Tidak valid") else Text("Contoh: 16 untuk target upload WhatsApp Status/Story.")
+                    },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Berlaku untuk semua video di antrian — bitrate dihitung ulang per video sesuai durasinya masing-masing saat batch diproses, bukan satu bitrate tetap untuk semua.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { sizeValue?.let(onSave) },
+                enabled = isValid
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> OptionSection(
@@ -2942,14 +3119,26 @@ private fun StudioScreen(
                         },
                         onShare = {
                             val publicUri = entry.publicUri
-                            if (publicUri != null) {
+                            if (entry.kind == "GIF") {
+                                if (publicUri != null) {
+                                    shareGifUri(context, Uri.parse(publicUri))
+                                } else {
+                                    shareGifFile(context, File(entry.outputFilePath))
+                                }
+                            } else if (publicUri != null) {
                                 shareVideoUri(context, Uri.parse(publicUri))
                             } else {
                                 shareVideo(context, File(entry.outputFilePath))
                             }
                         },
                         onOpenInGallery = entry.publicUri?.let { uriString ->
-                            { openInGallery(context, Uri.parse(uriString)) }
+                            {
+                                if (entry.kind == "GIF") {
+                                    openGifInGallery(context, Uri.parse(uriString))
+                                } else {
+                                    openInGallery(context, Uri.parse(uriString))
+                                }
+                            }
                         },
                         onDelete = { pendingDeleteEntry = entry }
                     )
@@ -2997,66 +3186,90 @@ private fun StudioEntryCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Icon(Icons.Filled.Movie, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        if (entry.kind == "GIF") Icons.Filled.Gif else Icons.Filled.Movie,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
             Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                val aspectLabel = AspectRatioOption.ENTRIES.firstOrNull { it.name == entry.aspectRatioName }?.label ?: entry.aspectRatioName
-                val resLabel = ResolutionOption.ENTRIES.firstOrNull { it.name == entry.resolutionName }?.label ?: entry.resolutionName
-                val rotLabel = RotationOption.ENTRIES.firstOrNull { it.name == entry.rotationName }?.label ?: entry.rotationName
-                val qualityOpt = QualityOption.ENTRIES.firstOrNull { it.name == entry.qualityName } ?: QualityOption.ORIGINAL
-                val qualityLabel = if (qualityOpt == QualityOption.CUSTOM && entry.customBitrateKbps != null) {
-                    "${entry.customBitrateKbps} kbps"
+                if (entry.kind == "GIF") {
+                    // GIF entries carry none of the resize-specific fields
+                    // above (aspect/resolution/rotation/quality/watermark/
+                    // caption/flip/frame-rate) — they're a completely
+                    // different export pipeline (GifExporter, not
+                    // VideoResizer/Transformer), so this branch shows the
+                    // settings that actually apply to a GIF instead.
+                    val gifDetails = listOfNotNull(
+                        "GIF",
+                        if (entry.gifFps > 0) "${entry.gifFps} fps" else null,
+                        if (entry.gifWidthPx > 0) "${entry.gifWidthPx}px" else null
+                    )
+                    Text(
+                        gifDetails.joinToString(" • "),
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 } else {
-                    qualityOpt.label
-                }
-                Text(
-                    "$aspectLabel • $resLabel" + if (rotLabel != "0°") " • $rotLabel" else "",
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (qualityOpt != QualityOption.ORIGINAL) {
+                    val aspectLabel = AspectRatioOption.ENTRIES.firstOrNull { it.name == entry.aspectRatioName }?.label ?: entry.aspectRatioName
+                    val resLabel = ResolutionOption.ENTRIES.firstOrNull { it.name == entry.resolutionName }?.label ?: entry.resolutionName
+                    val rotLabel = RotationOption.ENTRIES.firstOrNull { it.name == entry.rotationName }?.label ?: entry.rotationName
+                    val qualityOpt = QualityOption.ENTRIES.firstOrNull { it.name == entry.qualityName } ?: QualityOption.ORIGINAL
+                    val qualityLabel = if (qualityOpt == QualityOption.CUSTOM && entry.customBitrateKbps != null) {
+                        "${entry.customBitrateKbps} kbps"
+                    } else {
+                        qualityOpt.label
+                    }
                     Text(
-                        "Kualitas: $qualityLabel",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
+                        "$aspectLabel • $resLabel" + if (rotLabel != "0°") " • $rotLabel" else "",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                }
-                if (!entry.watermarkUri.isNullOrEmpty()) {
-                    Text(
-                        "Watermark aktif",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                if (!entry.captionText.isNullOrBlank()) {
-                    Text(
-                        "Caption aktif",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                run {
-                    // Polish (Batch 11): flip/frame-rate weren't shown anywhere
-                    // in this history card before, even though they're saved
-                    // per-entry since Batch 9 — matches how rotation/quality/
-                    // watermark/caption already surface here.
-                    val flipOpt = FlipOption.ENTRIES.firstOrNull { it.name == entry.flipName } ?: FlipOption.NONE
-                    val frameRateOpt = FrameRateOption.ENTRIES.firstOrNull { it.name == entry.frameRateName } ?: FrameRateOption.ORIGINAL
-                    val extras = listOfNotNull(
-                        if (flipOpt != FlipOption.NONE) "Flip ${flipOpt.label}" else null,
-                        if (frameRateOpt != FrameRateOption.ORIGINAL) frameRateOpt.label else null
-                    )
-                    if (extras.isNotEmpty()) {
+                    if (qualityOpt != QualityOption.ORIGINAL) {
                         Text(
-                            extras.joinToString(" • "),
+                            "Kualitas: $qualityLabel",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                    if (!entry.watermarkUri.isNullOrEmpty()) {
+                        Text(
+                            "Watermark aktif",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (!entry.captionText.isNullOrBlank()) {
+                        Text(
+                            "Caption aktif",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    run {
+                        // Polish (Batch 11): flip/frame-rate weren't shown anywhere
+                        // in this history card before, even though they're saved
+                        // per-entry since Batch 9 — matches how rotation/quality/
+                        // watermark/caption already surface here.
+                        val flipOpt = FlipOption.ENTRIES.firstOrNull { it.name == entry.flipName } ?: FlipOption.NONE
+                        val frameRateOpt = FrameRateOption.ENTRIES.firstOrNull { it.name == entry.frameRateName } ?: FrameRateOption.ORIGINAL
+                        val extras = listOfNotNull(
+                            if (flipOpt != FlipOption.NONE) "Flip ${flipOpt.label}" else null,
+                            if (frameRateOpt != FrameRateOption.ORIGINAL) frameRateOpt.label else null
+                        )
+                        if (extras.isNotEmpty()) {
+                            Text(
+                                extras.joinToString(" • "),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
                 Text(
@@ -3255,6 +3468,16 @@ private fun shareGifFile(context: android.content.Context, file: File) {
         return
     }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    shareGifUri(context, uri)
+}
+
+/**
+ * GIF counterpart of [shareVideoUri] — shares the durable public MediaStore
+ * copy directly by its content:// Uri. Prefer this over [shareGifFile]
+ * wherever a [VideoHistoryEntry] has a non-null publicUri, same reasoning
+ * as the video-share helpers above.
+ */
+private fun shareGifUri(context: android.content.Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "image/gif"
         putExtra(Intent.EXTRA_STREAM, uri)
@@ -3288,7 +3511,11 @@ private fun openGifInGallery(context: android.content.Context, uri: Uri) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GifScreen(onBack: () -> Unit) {
+private fun GifScreen(
+    onBack: () -> Unit,
+    prefill: GifPrefill? = null,
+    onPrefillConsumed: () -> Unit = {}
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -3307,6 +3534,25 @@ private fun GifScreen(onBack: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
     var activeJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
+    // Shared by the picker launcher below and the prefill effect further
+    // down — both need "duration/width/height of this uri, or null if it
+    // can't be read", so this factors out the duplicate MediaMetadataRetriever
+    // probe rather than having two near-identical copies of it in one screen.
+    suspend fun loadSourceMetadata(uri: Uri): Triple<Long, Int, Int>? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            val d = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            if (d > 0) Triple(d, w, h) else null
+        } catch (e: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
     val pickVideoLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -3318,20 +3564,7 @@ private fun GifScreen(onBack: () -> Unit) {
             galleryUri = null
             message = null
             scope.launch {
-                val loaded = withContext(Dispatchers.IO) {
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        retriever.setDataSource(context, uri)
-                        val d = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                        val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                        val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-                        if (d > 0) Triple(d, w, h) else null
-                    } catch (e: Exception) {
-                        null
-                    } finally {
-                        retriever.release()
-                    }
-                }
+                val loaded = loadSourceMetadata(uri)
                 if (loaded != null) {
                     selectedUri = uri
                     durationMs = loaded.first
@@ -3343,6 +3576,31 @@ private fun GifScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+
+    // "Edit ulang" from a saved GIF history entry — see GifPrefill's doc
+    // comment. Re-probes duration/width/height rather than trusting a
+    // possibly-stale saved value, same caution StudioScreen's onEditAgain
+    // already applies before reopening ResizerScreen with a video prefill.
+    LaunchedEffect(prefill) {
+        val p = prefill ?: return@LaunchedEffect
+        val loaded = loadSourceMetadata(p.uri)
+        if (loaded != null) {
+            val (d, w, h) = loaded
+            selectedUri = p.uri
+            durationMs = d
+            sourceWidth = w
+            sourceHeight = h
+            fps = p.fps
+            targetWidth = p.targetWidth
+            trimRange = (p.trimStartMs.toFloat() / d).coerceIn(0f, 1f)..(p.trimEndMs.toFloat() / d).coerceIn(0f, 1f)
+            resultFile = null
+            galleryUri = null
+            message = null
+        } else {
+            android.widget.Toast.makeText(context, "Video sumber tidak lagi bisa diakses (mungkin sudah dihapus/dipindah).", android.widget.Toast.LENGTH_LONG).show()
+        }
+        onPrefillConsumed()
     }
 
     LaunchedEffect(selectedUri, durationMs) {
@@ -3531,6 +3789,40 @@ private fun GifScreen(onBack: () -> Unit) {
                                             "Selesai. GIF tersimpan di Galeri > Pictures > VideoResizer (${result.frameCount} frame)."
                                         } else {
                                             "GIF selesai dibuat (${result.frameCount} frame), tapi gagal disalin ke galeri publik. Tetap tersedia lewat tombol Share di bawah."
+                                        }
+                                        // Studio history entry (Batch 12).
+                                        // thumbnailPath deliberately points
+                                        // at the GIF file itself rather than
+                                        // a separately-extracted static
+                                        // frame: BitmapFactory.decodeFile
+                                        // (what StudioEntryCard already
+                                        // uses for the thumbnail) happily
+                                        // reads a GIF's first frame as a
+                                        // plain Bitmap, so no extra
+                                        // thumbnail-generation step is
+                                        // needed the way the video path
+                                        // needs extractVideoThumbnail.
+                                        withContext(Dispatchers.IO) {
+                                            VideoHistoryStore.add(
+                                                context,
+                                                VideoHistoryEntry(
+                                                    id = UUID.randomUUID().toString(),
+                                                    createdAt = System.currentTimeMillis(),
+                                                    outputFilePath = outFile.absolutePath,
+                                                    thumbnailPath = outFile.absolutePath,
+                                                    sourceUri = uri.toString(),
+                                                    aspectRatioName = AspectRatioOption.ORIGINAL.name,
+                                                    resolutionName = ResolutionOption.ORIGINAL.name,
+                                                    rotationName = RotationOption.NONE.name,
+                                                    muteAudio = false,
+                                                    trimStartMs = startMs,
+                                                    trimEndMs = endMs,
+                                                    publicUri = publicUri?.toString(),
+                                                    kind = "GIF",
+                                                    gifFps = fps,
+                                                    gifWidthPx = targetWidth
+                                                )
+                                            )
                                         }
                                     }
                                     is GifExportResult.Failure -> {

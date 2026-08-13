@@ -52,7 +52,18 @@ data class VideoHistoryEntry(
     val captionPositionName: String = WatermarkPosition.BOTTOM_RIGHT.name,
     /** Flip/frame-rate settings used for this export. Defaults keep entries saved before Batch 9 readable. */
     val flipName: String = FlipOption.NONE.name,
-    val frameRateName: String = FrameRateOption.ORIGINAL.name
+    val frameRateName: String = FrameRateOption.ORIGINAL.name,
+    /**
+     * Distinguishes a GIF export (Batch 12: GifExporter, a completely
+     * separate pipeline from VideoResizer/Transformer) from an ordinary
+     * video export. "VIDEO" for every entry saved before this field
+     * existed. Studio branches display/share/"Edit ulang" behavior on
+     * this rather than trying to infer it from the file extension.
+     */
+    val kind: String = "VIDEO",
+    /** GIF-only settings. 0 for VIDEO entries / entries saved before GIF history support existed. */
+    val gifFps: Int = 0,
+    val gifWidthPx: Int = 0
 )
 
 /**
@@ -133,6 +144,9 @@ object VideoHistoryStore {
         put("captionPositionName", entry.captionPositionName)
         put("flipName", entry.flipName)
         put("frameRateName", entry.frameRateName)
+        put("kind", entry.kind)
+        put("gifFps", entry.gifFps)
+        put("gifWidthPx", entry.gifWidthPx)
     }
 
     private fun fromJson(obj: JSONObject): VideoHistoryEntry? = runCatching {
@@ -165,7 +179,10 @@ object VideoHistoryStore {
             captionText = obj.optString("captionText", "").ifEmpty { null },
             captionPositionName = obj.optString("captionPositionName", WatermarkPosition.BOTTOM_RIGHT.name),
             flipName = obj.optString("flipName", FlipOption.NONE.name),
-            frameRateName = obj.optString("frameRateName", FrameRateOption.ORIGINAL.name)
+            frameRateName = obj.optString("frameRateName", FrameRateOption.ORIGINAL.name),
+            kind = obj.optString("kind", "VIDEO"),
+            gifFps = obj.optInt("gifFps", 0),
+            gifWidthPx = obj.optInt("gifWidthPx", 0)
         )
     }.getOrNull()
 }

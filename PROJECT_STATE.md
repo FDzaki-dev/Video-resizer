@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 11**. This is the first-read file per the context
+Snapshot as of **Batch 12**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -19,6 +19,11 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 12** — Closed both of Batch 9's explicit scope cuts: BatchScreen
+  now has Flip/Frame Rate/Target-Size (MB) — the last one resolved
+  per-item against each queued video's own duration, not one shared
+  bitrate — and GIF exports now save to Studio history with their own
+  `kind`/"Edit ulang" (`GifPrefill`)/share-mime handling.
 - **Batch 11** — Debug/polish pass over Batch 9/10's GIF + target-size +
   Studio history code (no new features): GIF playback-delay drift fix,
   corrupt-frame guard, a perf fix in GIF quantization, a target-size-clamp
@@ -91,26 +96,16 @@ architecture/quirk notes live in README.md.
   the place to swap in something like median-cut/NeuQuant.
 
 ## Known pending items (not yet actioned)
-- 🟡 **Batch 11 fixes not yet CI-verified** — same caveat as every batch:
+- 🟡 **Batch 12 changes not yet CI-verified** — same caveat as every batch:
   structural checks + manual review only, push and confirm the next
-  Actions run is green.
-- 🟡 **Batch 10 fix not yet CI-verified**: the `GifExporter.kt` type-mismatch
-  fix and the new failure-log workflow step are both structurally checked
-  only (brace/paren balance + YAML parse), same as every batch — push and
-  check the next Actions run is genuinely green before treating Batch 9's
-  GIF feature as confirmed-working.
+  Actions run is green (Batch 10 and 11 were both confirmed green before
+  this batch started, per the user).
 - 🟡 Manual-only cleanup: the pre-Batch-5 duplicated `v1.13` GitHub Release
   (old tag collision) — needs `gh release delete v1.13 -y` on the user's
   end; not something a code batch can retroactively fix.
 - ⚪ Not done, flagged as risky-without-a-real-build (see CHANGELOG.md
   Batch 4 "Deliberately not done" section): AGP/Kotlin version bump,
   `org.gradle.configuration-cache=true`.
-- ⚪ **Batch 9 scope cut**: `BatchScreen` doesn't yet expose Flip/Frame
-  Rate/Target-Size — batch jobs use safe defaults (NONE/ORIGINAL) so
-  nothing broke, but the controls only exist in the single-video Resizer
-  screen for now.
-- ⚪ **Batch 9 scope cut**: GIF exports aren't written to `VideoHistoryStore`
-  — no "Edit ulang" for a past GIF yet, share/gallery-save only.
 
 ## Known constraints on this side (Claude's sandbox)
 - No `gradle`/`kotlinc`/`gh` available here — every batch is verified by
