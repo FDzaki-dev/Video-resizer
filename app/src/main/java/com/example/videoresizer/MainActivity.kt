@@ -414,6 +414,11 @@ private fun ResizerScreen(
     // user had already picked. This gates that action behind a confirmation
     // whenever there's actually something to lose.
     var showChangeVideoConfirm by remember { mutableStateOf(false) }
+    // Batch 13: drives the custom in-app VideoPickerScreen overlay (see that
+    // file) — replaces the OS Photo Picker as this screen's video-selection
+    // entry point. A plain boolean overlay flag, same convention as every
+    // other show*Dialog/showChangeVideoConfirm state in this composable.
+    var showVideoPicker by remember { mutableStateOf(false) }
     val hasCustomizedSettings by remember {
         derivedStateOf {
             aspectRatio != AspectRatioOption.ORIGINAL ||
@@ -649,46 +654,43 @@ private fun ResizerScreen(
         }
     }
 
-    // Uses Android's built-in system Photo Picker (the same "Gallery" UI apps like
-    // Photos/Google Photos surface) instead of the generic document/file picker.
-    val pickVideoLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            // Photo Picker grants are one-shot and generally NOT persistable across
-            // app restarts; this is attempted anyway so "Edit ulang" can still work
-            // within the same session, but may silently fail to persist — see README.
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            resultMessage = null
-            outputFile = null
-            galleryUri = null
-            resultThumbnailFile = null
-            customWidth = null
-            customHeight = null
-            // PERF: this callback runs directly on the Main thread (it's an
-            // ActivityResult callback, not a composable/coroutine scope), so
-            // calling the now-suspend loadVideoMetadata requires an explicit
-            // scope.launch — without it this would no longer compile, which
-            // is a deliberate guardrail against silently blocking Main again.
-            scope.launch {
-                loadVideoMetadata(
-                    uri,
-                    onLoaded = { d, w, h ->
-                        selectedUri = uri
-                        durationMs = d
-                        sourceWidth = w
-                        sourceHeight = h
-                        trimRange = 0f..1f
-                    },
-                    onFailed = {
-                        durationMs = 0L
-                        selectedUri = null
-                        resultMessage = "Video ini tidak bisa dibaca (mungkin format tidak didukung atau file rusak). Coba pilih video lain."
-                    }
-                )
-            }
+    // Batch 13: the video Uri arrives from VideoPickerScreen (in-app,
+    // MediaStore-backed) now instead of the OS Photo Picker, but everything
+    // downstream of "we have a Uri" is unchanged — same metadata load, same
+    // reset-on-new-video behavior. content:// Uris queried straight from
+    // MediaStore are readable app-wide as long as READ_MEDIA_VIDEO /
+    // READ_EXTERNAL_STORAGE is granted (which VideoPickerScreen itself
+    // checks before it ever lists anything), so unlike the old Photo-Picker
+    // grant this doesn't need a persistable-permission dance — the
+    // runCatching call below is a harmless no-op for this Uri type, kept
+    // only so a re-share of a document-provider Uri (e.g. via "Edit ulang"
+    // on very old history entries) still gets the same best-effort attempt.
+    fun handlePickedVideo(uri: Uri) {
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        resultMessage = null
+        outputFile = null
+        galleryUri = null
+        resultThumbnailFile = null
+        customWidth = null
+        customHeight = null
+        scope.launch {
+            loadVideoMetadata(
+                uri,
+                onLoaded = { d, w, h ->
+                    selectedUri = uri
+                    durationMs = d
+                    sourceWidth = w
+                    sourceHeight = h
+                    trimRange = 0f..1f
+                },
+                onFailed = {
+                    durationMs = 0L
+                    selectedUri = null
+                    resultMessage = "Video ini tidak bisa dibaca (mungkin format tidak didukung atau file rusak). Coba pilih video lain."
+                }
+            )
         }
     }
 
@@ -715,7 +717,7 @@ private fun ResizerScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showChangeVideoConfirm = false
-                    pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                    showVideoPicker = true
                 }) { Text("Ganti video") }
             },
             dismissButton = {
@@ -769,6 +771,12 @@ private fun ResizerScreen(
     } else {
         androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.background)
     }
+    // Batch 13: wraps the existing Scaffold so VideoPickerScreen can be
+    // drawn as an opaque full-screen overlay on top of it — same "stays
+    // composed underneath, overlay drawn on top" pattern VideoResizerApp
+    // already uses for Studio/Batch/GIF, so nothing about ResizerScreen's
+    // own state gets torn down while the picker is open.
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         modifier = Modifier.fillMaxSize().background(screenBackground),
         topBar = {
@@ -841,9 +849,7 @@ private fun ResizerScreen(
         ) {
             if (selectedUri == null) {
                 VideoPickerCard(
-                    onPickClick = {
-                        pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
-                    }
+                    onPickClick = { showVideoPicker = true }
                 )
             } else if (durationMs > 0) {
                 // Local val capture instead of !!: selectedUri is Compose mutable
@@ -864,7 +870,7 @@ private fun ResizerScreen(
                             if (hasCustomizedSettings) {
                                 showChangeVideoConfirm = true
                             } else {
-                                pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                                showVideoPicker = true
                             }
                         }
                     )
@@ -1464,6 +1470,16 @@ private fun ResizerScreen(
                 }
             }
         }
+    }
+    if (showVideoPicker) {
+        VideoPickerScreen(
+            onVideoSelected = { uri ->
+                showVideoPicker = false
+                handlePickedVideo(uri)
+            },
+            onCancel = { showVideoPicker = false }
+        )
+    }
     }
 }
 
@@ -3553,27 +3569,28 @@ private fun GifScreen(
         }
     }
 
-    val pickVideoLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            resultFile = null
-            galleryUri = null
-            message = null
-            scope.launch {
-                val loaded = loadSourceMetadata(uri)
-                if (loaded != null) {
-                    selectedUri = uri
-                    durationMs = loaded.first
-                    sourceWidth = loaded.second
-                    sourceHeight = loaded.third
-                    trimRange = 0f..1f
-                } else {
-                    android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
-                }
+    // Batch 13: video Uri now comes from the in-app VideoPickerScreen
+    // overlay instead of the OS Photo Picker — see the identical comment on
+    // ResizerScreen's handlePickedVideo for why takePersistableUriPermission
+    // is still attempted (harmless no-op for a plain MediaStore Uri).
+    var showVideoPicker by remember { mutableStateOf(false) }
+    fun handlePickedVideo(uri: Uri) {
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        resultFile = null
+        galleryUri = null
+        message = null
+        scope.launch {
+            val loaded = loadSourceMetadata(uri)
+            if (loaded != null) {
+                selectedUri = uri
+                durationMs = loaded.first
+                sourceWidth = loaded.second
+                sourceHeight = loaded.third
+                trimRange = 0f..1f
+            } else {
+                android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -3631,6 +3648,9 @@ private fun GifScreen(
         onBack()
     }
 
+    // Batch 13: same Box-wrap-Scaffold overlay pattern as ResizerScreen, so
+    // VideoPickerScreen can render on top without unmounting this screen.
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -3655,7 +3675,7 @@ private fun GifScreen(
         ) {
             if (selectedUri == null || durationMs <= 0) {
                 VideoPickerCard(
-                    onPickClick = { pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) }
+                    onPickClick = { showVideoPicker = true }
                 )
             } else {
                 // Local val capture instead of !!, same reasoning as
@@ -3674,7 +3694,7 @@ private fun GifScreen(
                     isForeground = true,
                     onTrimRangeChange = { trimRange = it },
                     onPickDifferent = {
-                        pickVideoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                        showVideoPicker = true
                     }
                 )
 
@@ -3860,5 +3880,15 @@ private fun GifScreen(
                 }
             }
         }
+    }
+    if (showVideoPicker) {
+        VideoPickerScreen(
+            onVideoSelected = { uri ->
+                showVideoPicker = false
+                handlePickedVideo(uri)
+            },
+            onCancel = { showVideoPicker = false }
+        )
+    }
     }
 }

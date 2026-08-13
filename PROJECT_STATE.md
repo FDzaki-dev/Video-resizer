@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 12**. This is the first-read file per the context
+Snapshot as of **Batch 13**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -8,17 +8,32 @@ architecture/quirk notes live in README.md.
 
 ## Current version
 - `versionName`/`versionCode` both dynamic since Batch 8: base semantic
-  label **`"1.14"`** (bumped from `1.13` this batch — `val
+  label **`"1.17"`** (bumped from `1.16` this batch — `val
   semanticVersionName` in `app/build.gradle.kts`, bump manually per feature
   batch) with `-build<n>` appended in CI; `versionCode` =
-  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.14` / `1014` for
+  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.17` / `1013` for
   any non-CI build.
+- ⚠️ **Version-history gap noticed this batch**: the uploaded project's
+  `app/build.gradle.kts` was already at `1.16` — a full minor ahead of the
+  `"1.14"` this file's own Batch 12 entry recorded. Something bumped it to
+  `1.15`/`1.16` without a matching CHANGELOG/PROJECT_STATE update. Not
+  investigated further — `1.16` was treated as ground truth and bumped
+  forward from there — but worth knowing this file's batch numbering isn't
+  100% guaranteed authoritative if a future discrepancy shows up again.
 - Package: `com.example.videoresizer`, minSdk 24, targetSdk/compileSdk 34
 - AGP 8.4.0, Kotlin 1.9.24, Gradle 8.7 (no wrapper jar — see FILE_MANIFEST.txt)
 - **Media3: 1.4.1** (bumped from 1.3.1 this batch, see Batch 9 below).
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 13** — New `VideoPickerScreen.kt`: full-screen in-app video
+  picker (MediaStore-backed, Videos/Folders tabs, list rows with
+  thumbnail/name/duration/resolution/date/size, sort menu, explicit
+  "Batal" cancel), replacing the OS Photo Picker for `ResizerScreen`'s and
+  `GifScreen`'s single-video pick only — `BatchScreen`'s multi-pick and
+  both watermark-image pickers are unchanged (see CHANGELOG's "out of
+  scope" note). "UI asimetris" on the trim editor was investigated but not
+  fixed — see "Known pending items" below.
 - **Batch 12** — Closed both of Batch 9's explicit scope cuts: BatchScreen
   now has Flip/Frame Rate/Target-Size (MB) — the last one resolved
   per-item against each queued video's own duration, not one shared
@@ -94,12 +109,27 @@ architecture/quirk notes live in README.md.
   itself. If GIF output quality ever needs to improve, the palette
   algorithm (`GifExporter.buildPalette`, a frequency-bucket approach) is
   the place to swap in something like median-cut/NeuQuant.
+- **Single-video pick goes through `VideoPickerScreen.kt`, not the OS
+  Photo Picker, as of Batch 13** — `ResizerScreen`/`GifScreen` only.
+  `BatchScreen`'s multi-pick and the two watermark-image pickers still use
+  `ActivityResultContracts.PickVisualMedia`/`PickMultipleVisualMedia`
+  unchanged. If multi-select ever needs the same list-style treatment,
+  that's new scope, not an extension of the existing single-pick screen.
 
 ## Known pending items (not yet actioned)
-- 🟡 **Batch 12 changes not yet CI-verified** — same caveat as every batch:
-  structural checks + manual review only, push and confirm the next
-  Actions run is green (Batch 10 and 11 were both confirmed green before
-  this batch started, per the user).
+- 🔴 **"UI asimetris" on the trim editor — needs the user to point at the
+  specific element.** Reported against `VideoEditorPreview` (the
+  play-preview + filmstrip trim card). Reviewed the composable's layout
+  code closely — player box (fixed 220dp) → time-label row → filmstrip/
+  trim-handle box (fixed `trackHeight`) → details row, all separated by
+  plain `Arrangement.spacedBy(12.dp)` with no `weight`/`fillMaxHeight`
+  anywhere that could explain a large empty gap — and couldn't identify a
+  concrete structural cause with high confidence. Asked the user directly
+  which element/region looks off rather than shipping a guessed fix that
+  might be a no-op. **Next batch: read their answer here first.**
+- 🟡 **Batch 13 changes not yet CI-verified** — same caveat as every
+  batch: structural checks (brace/paren balance) + manual review only,
+  push and confirm the next Actions run is green.
 - 🟡 Manual-only cleanup: the pre-Batch-5 duplicated `v1.13` GitHub Release
   (old tag collision) — needs `gh release delete v1.13 -y` on the user's
   end; not something a code batch can retroactively fix.

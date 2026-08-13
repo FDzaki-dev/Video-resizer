@@ -19,14 +19,15 @@ ROOT
   FILE_MANIFEST.txt                        this file
 
 app/
-  build.gradle.kts                         [PROTECTED] app module: deps (media3 1.4.1 since Batch 9), signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false
+  build.gradle.kts                         [PROTECTED] app module: deps (media3 1.4.1 since Batch 9, material-icons-extended already present), signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false; semanticVersionName 1.17 (Batch 13)
   proguard-rules.pro                       R8 rules (inactive while isMinifyEnabled=false)
 
 app/src/main/
   AndroidManifest.xml                      [PROTECTED] android:name=".VideoResizerApp" (Batch 2), permissions, activity decl
 
 app/src/main/java/com/example/videoresizer/
-  MainActivity.kt                          [PROTECTED — MainActivity] all 4 screens (Resizer/Studio/Batch/GIF), Compose UI, theme picker; Batch 12: BatchScreen gained Flip/FrameRate/Target-Size, GIF entries in Studio history
+  MainActivity.kt                          [PROTECTED — MainActivity] all 4 screens (Resizer/Studio/Batch/GIF), Compose UI, theme picker; Batch 12: BatchScreen gained Flip/FrameRate/Target-Size, GIF entries in Studio history; Batch 13: ResizerScreen + GifScreen's single-video pick now opens VideoPickerScreen (in-app) instead of the OS Photo Picker — BatchScreen's multi-pick and both watermark pickers are unchanged/out of scope
+  VideoPickerScreen.kt                     (new, Batch 13) full-screen in-app video picker — MediaStore query, Videos/Folders tabs, list rows (thumbnail/name/duration/resolution/date/size), explicit "Batal" cancel
   VideoResizerApp.kt                       [PROTECTED — Application] installs CrashLogger.install() in onCreate (Batch 2)
   CrashLogger.kt                           uncaught-exception handler → MediaStore Documents/VideoResizer/logs/, FIFO 50 (Batch 2)
   VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay, flip/frame-rate/target-size (Batch 9)

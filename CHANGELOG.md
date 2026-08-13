@@ -1,5 +1,64 @@
 # Changelog
 
+## Unreleased — Batch 13: Custom in-app video picker (replaces OS Photo Picker for single-video pick)
+
+User feedback on the existing flow: the OS Photo Picker's look (grid tiles,
+OEM-themed "Video"/"Koleksi" tabs) isn't something this app controls, and
+they wanted a list-style picker instead — one row per video with thumbnail
++ filename + duration + resolution + date + size, plus a Videos/Folders
+split, styled after a reference file-manager-style picker they use. Also
+asked for a clear cancel affordance for a wrong tap.
+
+- **`VideoPickerScreen.kt` (new)** — full-screen composable, queries
+  `MediaStore.Video.Media` directly (already covered by the existing
+  `READ_MEDIA_VIDEO`/`READ_EXTERNAL_STORAGE` manifest permission, so no new
+  permission was added):
+  - **Videos tab**: flat list, newest-first by default, each row showing a
+    lazily-loaded thumbnail (`ContentResolver.loadThumbnail` on API 29+,
+    the older `MediaStore.Video.Thumbnails` table below that — minSdk is
+    still 24), filename, `mm:ss • WxH`, and `date • size`.
+  - **Folders tab**: videos grouped by `BUCKET_ID`/`BUCKET_DISPLAY_NAME`,
+    each row showing an item/duration/size summary and the most-recent
+    video's thumbnail as the cover; tapping drills into that folder's own
+    video list (same row layout as the Videos tab).
+  - **Sort menu** (top bar): Terbaru / Terlama / Nama (A-Z) / Ukuran
+    terbesar — applies to whichever video list is currently showing
+    (root Videos tab or an open folder).
+  - **Cancel**: both the back arrow (steps out of an open folder first,
+    only exits the picker once already at the root) and an always-visible
+    "Batal" text button in the top bar — the explicit ask from this batch,
+    so a wrong tap into the picker always has one unambiguous way out
+    regardless of whether a folder is open.
+  - **Permission handling**: if READ_MEDIA_VIDEO/READ_EXTERNAL_STORAGE
+    isn't granted, shows an explanatory panel with a Grant button instead
+    of silently listing nothing.
+- **`ResizerScreen`/`GifScreen` integration (`MainActivity.kt`)** — the
+  `ActivityResultContracts.PickVisualMedia()` launcher used for the single
+  main-video pick is gone from both screens; their `VideoPickerCard` tap,
+  "Ganti video", and the change-video confirm dialog now all set a local
+  `showVideoPicker` flag instead, which renders `VideoPickerScreen` as a
+  full-screen overlay — same "Scaffold wrapped in a Box, overlay drawn on
+  top, nothing underneath loses state" pattern `VideoResizerApp` already
+  uses for Studio/Batch/GIF. The old picker-launcher callback body was
+  extracted into a plain `handlePickedVideo(uri)` function in each screen
+  so the metadata-load/state-reset logic didn't need duplicating.
+- **Explicitly out of scope this batch**: `BatchScreen`'s multi-video pick
+  (`PickMultipleVisualMedia`) and both watermark-image pickers
+  (`PickVisualMedia.ImageOnly`, in `ResizerScreen`/`BatchScreen`) are
+  unchanged — the reported UI/reference screenshots were both single-video
+  pick flows, and folding multi-select into the same custom picker is a
+  larger change (selection state, a confirm/done bar, etc.) better done as
+  its own batch if wanted.
+- **Reported but not fixed this batch**: "UI asimetris" on the trim editor
+  (`VideoEditorPreview`) — reviewed the composable's layout code closely
+  (player box → time labels → filmstrip/trim-handle box → details row, all
+  plain `Arrangement.spacedBy(12.dp)`, no `weight`/`fillMaxHeight` that
+  could explain a large gap) and couldn't identify a concrete structural
+  cause with high confidence from code review alone. Flagged back to the
+  user for a pointer to the specific element rather than shipping a
+  guessed fix — see PROJECT_STATE.md's pending items.
+- `semanticVersionName` bumped `1.16` → `1.17` (app/build.gradle.kts).
+
 ## Unreleased — Batch 12: Close out Batch 9's two scope cuts (BatchScreen controls, GIF history)
 
 Both of Batch 9's explicitly-deferred items, done together since they're
