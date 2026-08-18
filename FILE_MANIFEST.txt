@@ -12,6 +12,7 @@ ROOT
   gradle/wrapper/gradle-wrapper.properties [PROTECTED] Gradle 8.7 — matches .github/workflows/build.yml
   release.keystore                         [PROTECTED] signing keystore — NEVER delete/regenerate/gitignore
   .gitignore                               [PROTECTED]
+  .gitattributes                           [PROTECTED] LF normalization + binary-safe rules for keystore/apk/images (Batch 14)
   .github/workflows/build.yml              [PROTECTED] CI: assembleRelease + publish GitHub Release (Batch 5: unique tag/APK per run)
   README.md                                context: architecture notes, known quirks, operational status
   CHANGELOG.md                             context: full batch-by-batch history

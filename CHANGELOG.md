@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — Batch 14: Add missing .gitattributes (protected-asset gap fix)
+
+Identified via preference audit: `.gitattributes` is listed as a
+[PROTECTED] asset category in user preferences but never actually existed
+in this project. Added it now, config-only, zero app-code files touched.
+
+- **`.gitattributes` (new)** — `* text=auto eol=lf` normalizes all
+  source/text files (`.kt`, `.kts`, `.xml`, `.md`, `.properties`, etc.) to
+  LF on checkin, avoiding CRLF diff noise between environments (Termux/
+  Linux CI vs any Windows/macOS contributor). Binary assets
+  (`release.keystore`, `*.apk`, `*.aab`, `*.jks`, images/fonts) are marked
+  `binary -diff -merge` — `release.keystore` gets its own explicit line
+  beyond the `*.keystore` pattern so it stays byte-exact and un-diffable
+  even if that pattern is ever narrowed later.
+- `FILE_MANIFEST.txt` — added `.gitattributes` row under ROOT, marked
+  `[PROTECTED]`.
+- `PROJECT_STATE.md` — batch bumped 13b → 14, history entry added.
+
 ## Unreleased — Batch 13: Custom in-app video picker (replaces OS Photo Picker for single-video pick)
 
 User feedback on the existing flow: the OS Photo Picker's look (grid tiles,

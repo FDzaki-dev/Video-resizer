@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 13b**. This is the first-read file per the context
+Snapshot as of **Batch 14**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -26,6 +26,12 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 14** — Added `.gitattributes` (was missing since project start
+  despite being a [PROTECTED] asset category in user preferences): forces
+  LF line endings on all source/text files and marks `release.keystore`/
+  `*.apk`/`*.aab`/images explicitly `binary -diff -merge` so git never
+  attempts text-mode EOL conversion or diff/patch on them. No app code
+  touched.
 - **Batch 13b** — Follow-up to Batch 13's flagged "UI asimetris" item:
   user's clarification ("semua bagian yang gak kelihatan simetris") wasn't
   specific enough to target, so rather than keep asking, shipped the one
