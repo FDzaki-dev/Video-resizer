@@ -26,6 +26,17 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 18** — Fixed real CI compile failure from Batch 17 (run confirmed
+  failed, `compileReleaseKotlin FAILED`): `AnimatedVisibility(...)` at
+  MainActivity.kt:2356 resolved to the `ColumnScope.AnimatedVisibility`
+  extension (found via implicit-receiver search up through the enclosing
+  Card's Column, even though the call site is inside a nested Box) instead
+  of the intended top-level `androidx.compose.animation.AnimatedVisibility`
+  composable — Kotlin's error: "can't be called in this context by
+  implicit receiver". Fixed by fully-qualifying the call
+  (`androidx.compose.animation.AnimatedVisibility(...)`) and dropping the
+  now-unused bare import. Batch 17's other 2 changes (TrimHandle clamp,
+  controlsVisible state/timer) were untouched — only this one call site.
 - **Batch 17** — 3 UI bugs reported against `VideoEditorPreview` (screenshot,
   currently-installed APK — **note**: no APK has been released since before
   Batch 16's compile fix, so this screenshot is almost certainly an OLD

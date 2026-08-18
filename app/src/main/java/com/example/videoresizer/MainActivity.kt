@@ -11,7 +11,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -2353,7 +2352,15 @@ private fun VideoEditorPreview(
                         .height(220.dp)
                         .clip(RoundedCornerShape(12.dp))
                 )
-                AnimatedVisibility(
+                // Fully-qualified call (not the bare `AnimatedVisibility(...)`
+                // import): this Box sits inside the Card's outer Column, so
+                // Kotlin's implicit-receiver search also finds the
+                // ColumnScope.AnimatedVisibility extension from that
+                // enclosing scope and prefers it over the plain top-level
+                // composable — which then fails to compile because we're
+                // not directly in a ColumnScope here. Qualifying the call
+                // sidesteps the ambiguity entirely.
+                androidx.compose.animation.AnimatedVisibility(
                     visible = controlsVisible,
                     enter = fadeIn(),
                     exit = fadeOut()

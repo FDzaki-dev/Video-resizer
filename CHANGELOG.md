@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Batch 18: Fix CI compile failure from Batch 17 (AnimatedVisibility receiver ambiguity)
+
+Real CI signal: `assembleRelease` → `compileReleaseKotlin FAILED`, one error.
+
+- **`MainActivity.kt`**: `AnimatedVisibility(...)` around the play/pause
+  `IconButton` (added in Batch 17) failed to compile: `can't be called in
+  this context by implicit receiver`. Cause — that call sits inside a `Box`
+  which is itself nested inside the Card's outer `Column`; Kotlin's
+  implicit-receiver lookup walks outward through enclosing scopes and found
+  `ColumnScope.AnimatedVisibility` (an extension used for animating a
+  Column child's presence) before falling back to the plain top-level
+  `androidx.compose.animation.AnimatedVisibility` composable actually
+  intended here — and the former isn't legally callable from inside a Box.
+  Fix: fully-qualified the call as
+  `androidx.compose.animation.AnimatedVisibility(...)`, which bypasses
+  implicit-receiver resolution entirely, and removed the now-unused
+  `import androidx.compose.animation.AnimatedVisibility`. No behavior
+  change — same fade-in/fade-out, same trigger logic from Batch 17.
+
 ## Unreleased — Batch 17: Trim handle clip fix + play button auto-fade
 
 Reported via screenshot against `VideoEditorPreview` (main resizer screen).
