@@ -26,6 +26,32 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 17** — 3 UI bugs reported against `VideoEditorPreview` (screenshot,
+  currently-installed APK — **note**: no APK has been released since before
+  Batch 16's compile fix, so this screenshot is almost certainly an OLD
+  build; re-verify all 3 once the new release installs):
+  1. Trim handle "gets thinner toward the ends" — real bug, confirmed in
+     current source: the visible 16dp bar was centered exactly on
+     `fraction * trackWidthPx` with no clamp of its own, so near fraction
+     0f/1f up to half the bar sat outside `[0, trackWidthPx]` and got
+     sliced off by the shared rounded-corner `.clip()` on the parent Box.
+     Fixed: added `barCorrectionPx` that clamps the bar's own left edge to
+     `[0, trackWidthPx - handleWidthPx]` and nudges it inward by exactly
+     that amount, so the full bar is always inside the clip — no more
+     shrinking, and it now sits flush (not overhanging) at the extremes.
+  2. "Big empty gaps" around the `720×720 • Potong: ...` details row —
+     **could not reproduce in current source**: that Card uses
+     `spacedBy(12.dp)` internally and the outer Column uses
+     `spacedBy(20.dp)`, nowhere near the ~130dp/~110dp gaps described. No
+     `weight()`, no reserved-height placeholder, nothing else in that
+     Composable that could produce this. Left AS-IS pending a fresh
+     screenshot from the Batch 16+ build — likely explained by #2's note
+     above (stale APK).
+  3. Play/pause button never fades (during playback or while paused) — real
+     bug, confirmed: there was no auto-hide logic at all, `IconButton` was
+     permanently opaque. Added `controlsVisible` state + `AnimatedVisibility`
+     (fadeIn/fadeOut): auto-hides 2.5s into playback, reappears on tap
+     (button or video area), stays visible whenever paused/static.
 - **Batch 16** — Fixed real CI compile failure (run #46, `assembleRelease`
   exit 1): `VideoPickerScreen.kt`'s `VideoPickerScreen` composable (uses
   `TopAppBar`/`DropdownMenu`/`DropdownMenuItem`, all experimental Material3

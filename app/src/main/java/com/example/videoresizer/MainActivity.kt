@@ -11,10 +11,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -2305,6 +2309,24 @@ private fun VideoEditorPreview(
     val startMs = (trimRange.start * durationMs).toLong()
     val endMs = (trimRange.endInclusive * durationMs).toLong()
 
+    // BUG FIX (reported: play/pause button never fades, whether playing or
+    // paused/static): there used to be no auto-hide logic at all — the
+    // button sat permanently opaque on top of the video, which is both
+    // visually noisy over a static (paused) frame and, more importantly,
+    // stays in the way *during* playback when a standard player's controls
+    // are expected to step aside. `controlsVisible` drives a fade; it's
+    // reset to true (and the hide timer restarted) on every play/pause tap
+    // and on every direct tap on the video itself, but only actually
+    // *counts down* to hidden while playing — while paused/static the
+    // button stays visible, since there's nothing to watch unobstructed.
+    var controlsVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(isPlaying, controlsVisible) {
+        if (isPlaying && controlsVisible) {
+            kotlinx.coroutines.delay(2500)
+            controlsVisible = false
+        }
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -2312,7 +2334,13 @@ private fun VideoEditorPreview(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                ) { controlsVisible = true }
+            ) {
                 AndroidView(
                     factory = { ctx ->
                         PlayerView(ctx).apply {
@@ -2325,25 +2353,32 @@ private fun VideoEditorPreview(
                         .height(220.dp)
                         .clip(RoundedCornerShape(12.dp))
                 )
-                IconButton(
-                    onClick = {
-                        if (isPlaying) {
-                            exoPlayer.pause()
-                        } else {
-                            exoPlayer.seekTo(startMs)
-                            exoPlayer.play()
-                        }
-                        isPlaying = !isPlaying
-                    },
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), shape = androidx.compose.foundation.shape.CircleShape)
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut()
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White
-                    )
+                    IconButton(
+                        onClick = {
+                            if (isPlaying) {
+                                exoPlayer.pause()
+                            } else {
+                                exoPlayer.seekTo(startMs)
+                                exoPlayer.play()
+                            }
+                            isPlaying = !isPlaying
+                            controlsVisible = true
+                        },
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), shape = androidx.compose.foundation.shape.CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
 
@@ -2586,6 +2621,26 @@ private fun TrimHandle(
     // width, so the control doesn't look any different.
     val touchTargetWidth = 48.dp
     val touchTargetWidthPx = with(LocalDensity.current) { touchTargetWidth.toPx() }
+    val handleWidthPxLocal = handleWidthPx
+
+    // BUG FIX (reported: handle looks asymmetric, gets thinner toward the
+    // ends): the visible bar used to just be centered on `fraction *
+    // trackWidthPx` with no clamp of its own. Near the two extremes
+    // (fraction close to 0f or 1f) that center point puts up to half the
+    // 16dp bar outside [0, trackWidthPx] — and since the parent Box clips
+    // to the track's rounded shape (needed so the bar never overhangs past
+    // the filmstrip's rounded corners), that overhanging half gets sliced
+    // off. The bar doesn't move, but less and less of it is left
+    // *unclipped* as it nears an edge, which reads as it thinning out.
+    // Fix: compute how far the visible bar would want to sit outside
+    // [0, trackWidthPx - handleWidthPx] and cancel exactly that with an
+    // inner offset, so the full-width bar itself never crosses the track
+    // boundary — nothing left for the clip to cut into, at any fraction.
+    val barCorrectionPx = if (trackWidthPx > 0f) {
+        val desiredBarLeft = fraction * trackWidthPx - handleWidthPxLocal / 2f
+        val clampedBarLeft = desiredBarLeft.coerceIn(0f, (trackWidthPx - handleWidthPxLocal).coerceAtLeast(0f))
+        clampedBarLeft - desiredBarLeft
+    } else 0f
 
     Box(
         modifier = Modifier
@@ -2618,10 +2673,13 @@ private fun TrimHandle(
             },
         contentAlignment = Alignment.Center
     ) {
-        // The actually-visible handle — unchanged size/appearance, just now
-        // centered inside a larger invisible touch target above.
+        // The actually-visible handle — same size/appearance as before,
+        // centered inside the touch target by default, then nudged back
+        // inward by barCorrectionPx whenever centering it would have
+        // pushed part of it past the track's edge.
         Box(
             Modifier
+                .absoluteOffset { IntOffset(barCorrectionPx.roundToInt(), 0) }
                 .width(handleWidth)
                 .height(trackHeight)
                 .background(color, RoundedCornerShape(6.dp)),

@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased — Batch 17: Trim handle clip fix + play button auto-fade
+
+Reported via screenshot against `VideoEditorPreview` (main resizer screen).
+
+- **`MainActivity.kt` — `TrimHandle`**: fixed handle bar thinning near the
+  ends of the track. Root cause: the visible 16dp bar was centered on
+  `fraction * trackWidthPx` with no boundary clamp of its own; near
+  fraction 0f/1f that center point puts part of the bar outside
+  `[0, trackWidthPx]`, and the shared `.clip(RoundedCornerShape(10.dp))`
+  on the parent Box (added in the earlier "asymmetric edges" fix) slices
+  that overhanging part off — less of the bar survives the clip the
+  closer it gets to an edge, which reads as progressive thinning. Added
+  `barCorrectionPx`: clamps the bar's own left edge to
+  `[0, trackWidthPx - handleWidthPx]` and offsets the visible bar inward
+  by the clamp delta, so the bar itself never crosses the track boundary
+  — nothing left for the clip to cut, at any fraction, and it now sits
+  flush against the edge instead of overhanging OR thinning.
+- **`MainActivity.kt` — `VideoEditorPreview`**: play/pause button now
+  auto-fades. Added `controlsVisible` state driving an `AnimatedVisibility`
+  (fadeIn/fadeOut) around the `IconButton`: hides 2.5s after playback
+  starts, reappears immediately on tapping the button or anywhere on the
+  video itself, and stays visible the whole time while paused/static
+  (nothing to auto-hide from when there's no playback to watch
+  unobstructed). Previously there was no fade logic at all — the button
+  was permanently opaque regardless of play state.
+- Investigated a third report ("big empty gaps" around the
+  `720×720 • Potong: ...` row) — **not reproducible in current source**;
+  that Card's internal spacing is a tight `spacedBy(12.dp)` /
+  `spacedBy(20.dp)`, nowhere close to the size of gap described. No code
+  change made. Likely cause: no APK has actually been *released* since
+  before Batch 16's compile fix (`assembleRelease` was failing), so the
+  screenshot is probably from an older installed build with different
+  layout code. Needs a fresh screenshot from the next successful build to
+  confirm either way.
+
 ## Unreleased — Batch 16: Fix CI compile failure (missing @OptIn)
 
 Real CI signal from run #46 (`gradle assembleRelease`, exit code 1):
