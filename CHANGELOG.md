@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Batch 16: Fix CI compile failure (missing @OptIn)
+
+Real CI signal from run #46 (`gradle assembleRelease`, exit code 1):
+Kotlin compiler treated 3 experimental-Material3-API usages as errors,
+all inside one function.
+
+- **`app/src/main/java/com/example/videoresizer/VideoPickerScreen.kt`** —
+  added `@OptIn(ExperimentalMaterial3Api::class)` above `internal fun
+  VideoPickerScreen(...)`. That function's `TopAppBar` (line ~413) and
+  `DropdownMenu`/`DropdownMenuItem` (line ~453) are experimental Material3
+  APIs; every other Composable in the project using these APIs already has
+  this annotation (`MainActivity.kt` has 5 instances) — this was the one
+  function missing it, and the only compile error in the run.
+- Investigated why the failed run's log bundle had no
+  `log_fail_1.18_46` artifact even though `build.yml` defines that step:
+  confirmed it's simply because that step (`Prepare failure log name` +
+  `Upload failure logs`, both `if: failure()`) is already present and
+  correctly wired in the current `build.yml` — nothing to fix there. The
+  next push (with this fix) should compile clean and never hit that path
+  at all.
+
 ## Unreleased — Batch 15: Stale Run Guard in build.yml (anti-desync)
 
 Identified via preference audit: workflow had no protection against

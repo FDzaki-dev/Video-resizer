@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 15**. This is the first-read file per the context
+Snapshot as of **Batch 16**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -26,6 +26,19 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 16** — Fixed real CI compile failure (run #46, `assembleRelease`
+  exit 1): `VideoPickerScreen.kt`'s `VideoPickerScreen` composable (uses
+  `TopAppBar`/`DropdownMenu`/`DropdownMenuItem`, all experimental Material3
+  APIs) was missing `@OptIn(ExperimentalMaterial3Api::class)` — every other
+  Composable using these APIs project-wide already carries this annotation
+  (see `MainActivity.kt`), this one function was the sole gap. Added the
+  annotation directly above `internal fun VideoPickerScreen(...)`. Also
+  confirms the `log_fail_<version>_<run-number>` failure-artifact step
+  (`Prepare failure log name` / `Upload failure logs` in `build.yml`,
+  added Batch-unknown before this file's tracking) was simply absent from
+  *that specific* failed run's log bundle because it predates this fix —
+  `build.yml` already has both steps present and correctly gated on
+  `if: failure()`; no workflow change needed, only the compile fix.
 - **Batch 15** — Added Stale Run Guard to `build.yml`: new first step
   (right after checkout, before JDK setup/build/sign/release) compares
   `$GITHUB_SHA` against `origin/main`'s current tip via `git ls-remote`.

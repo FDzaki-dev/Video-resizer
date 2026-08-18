@@ -371,6 +371,7 @@ private fun PickerEmptyState(text: String) {
  * cancel out of this screen without picking anything, per the user's
  * request for a clear way back out after a wrong tap.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VideoPickerScreen(
     onVideoSelected: (Uri) -> Unit,
