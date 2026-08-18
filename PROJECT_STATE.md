@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 14**. This is the first-read file per the context
+Snapshot as of **Batch 15**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -26,6 +26,13 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 15** — Added Stale Run Guard to `build.yml`: new first step
+  (right after checkout, before JDK setup/build/sign/release) compares
+  `$GITHUB_SHA` against `origin/main`'s current tip via `git ls-remote`.
+  Mismatch (e.g. a GitHub "Re-run jobs" click on an old run after main has
+  since moved forward) aborts with `exit 1` before any build or publish
+  step runs — prevents a stale re-run from silently publishing an
+  outdated APK as a fresh GitHub Release. No app code touched.
 - **Batch 14** — Added `.gitattributes` (was missing since project start
   despite being a [PROTECTED] asset category in user preferences): forces
   LF line endings on all source/text files and marks `release.keystore`/

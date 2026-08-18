@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Batch 15: Stale Run Guard in build.yml (anti-desync)
+
+Identified via preference audit: workflow had no protection against
+GitHub's "Re-run jobs" being clicked on an *old* run after `main` had
+since moved forward — that re-run keeps the original run's `$GITHUB_SHA`
+(checkout still resolves to the old commit), so it would silently
+build+publish a GitHub Release from stale source, indistinguishable from
+a legitimate fresh release.
+
+- **`.github/workflows/build.yml`** — new step `Stale Run Guard
+  (Anti-Desync)` inserted immediately after `Checkout sources`, before JDK
+  setup / build / signing / release. Resolves `origin/main`'s current tip
+  via `git ls-remote origin refs/heads/main` and compares it to
+  `$GITHUB_SHA`; on mismatch (or if the tip can't be resolved at all),
+  logs an `::error::` explaining the likely cause and `exit 1`s
+  immediately — before any build minutes are spent or any release step
+  runs. On match, logs confirmation and proceeds exactly as before.
+- `FILE_MANIFEST.txt` — `build.yml` row's inline note updated to mention
+  the guard.
+- `PROJECT_STATE.md` — batch bumped 14 → 15, history entry added.
+
 ## Unreleased — Batch 14: Add missing .gitattributes (protected-asset gap fix)
 
 Identified via preference audit: `.gitattributes` is listed as a

@@ -13,7 +13,7 @@ ROOT
   release.keystore                         [PROTECTED] signing keystore — NEVER delete/regenerate/gitignore
   .gitignore                               [PROTECTED]
   .gitattributes                           [PROTECTED] LF normalization + binary-safe rules for keystore/apk/images (Batch 14)
-  .github/workflows/build.yml              [PROTECTED] CI: assembleRelease + publish GitHub Release (Batch 5: unique tag/APK per run)
+  .github/workflows/build.yml              [PROTECTED] CI: assembleRelease + publish GitHub Release (Batch 5: unique tag/APK per run; Batch 15: Stale Run Guard aborts stale 'Re-run jobs' before build/release)
   README.md                                context: architecture notes, known quirks, operational status
   CHANGELOG.md                             context: full batch-by-batch history
   PROJECT_STATE.md                         context: current state snapshot (this batch's companion file)
