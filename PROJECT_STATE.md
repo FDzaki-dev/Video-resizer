@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 31**. This is the first-read file per the context
+Snapshot as of **Batch 32**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -53,30 +53,27 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **[MEDIUM] `ASSUMED_FPS = 30` hardcoded di `CompressionLevel`
-   (VideoResizer.kt).** Rumus target bitrate (`bits-per-pixel-per-frame ×
-   ASSUMED_FPS`) selalu asumsi 30fps walau source aslinya 60fps (rekaman
-   slow-mo/action umum di HP) atau 24fps. Akibatnya: video 60fps dikompres
-   dengan bitrate yang sebenarnya dihitung untuk setengah frame-rate-nya →
-   kualitas per-frame turun lebih dari yang dijanjikan preset. Video 24fps
-   sebaliknya dapat bitrate lebih besar dari perlu → ukuran hasil lebih
-   besar dari optimal. Fix: probe `METADATA_KEY_CAPTURE_FRAMERATE` (atau
-   fallback ke track format) di `CompressorScreen`, alirkan sebagai field
-   baru di `CompressRequest`, pakai di `computeCompressTargetBitrateBps`
-   menggantikan konstanta `ASSUMED_FPS`.
-2. **[LOW] `estimateSourceBitrateBps` asumsi flat 128kbps audio.**
+1. **[LOW] `estimateSourceBitrateBps` asumsi flat 128kbps audio.**
    (VideoResizer.kt, dipakai `computeCompressTargetBitrateBps` sbg cap
    85%.) Source tanpa audio track sama sekali (tapi `muteAudio=false`
    diminta) akan salah dikurangi 128kbps dari estimasi bitrate video,
-   sedikit memperketat cap tanpa perlu. Edge case, dampak kecil — prioritas
-   rendah, kerjakan setelah item 1.
-3. **[LOW] "Batalkan" di CompressorScreen belum ada dialog konfirmasi
+   sedikit memperketat cap tanpa perlu. Edge case, dampak kecil.
+2. **[LOW] "Batalkan" di CompressorScreen belum ada dialog konfirmasi
    back-saat-proses** seperti `showExitWhileProcessingConfirm` di
-   ResizerScreen (baris ~648). Batch 31 sudah memperbaiki bagian yang
-   krusial (Transformer benar-benar berhenti), dialog konfirmasi ini murni
-   UX nice-to-have, bukan bug fungsional.
+   ResizerScreen (baris ~648). Bagian krusial (Transformer benar-benar
+   berhenti) sudah fix Batch 31; ini murni UX nice-to-have.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 32** — Lanjutan audit kompresi video: fix Pending Queue #1
+  (`ASSUMED_FPS=30` hardcoded). `CompressorScreen` sekarang probe fps asli
+  source via `MediaExtractor` + `MediaFormat.KEY_FRAME_RATE` (bukan
+  `MediaMetadataRetriever.CAPTURE_FRAMERATE` yang cuma keisi utk slow-mo
+  capture, bukan playback fps biasa). `CompressRequest.sourceFps` &
+  `estimateCompressedSizeBytes(sourceFps=...)` baru ditambahkan; keduanya
+  fallback ke `CompressionLevel.ASSUMED_FPS` kalau probe gagal (0). Video
+  60fps sekarang dapat bitrate yang benar-benar dihitung utk 60fps
+  (kualitas sesuai janji preset), video 24fps gak lagi dapat bitrate
+  berlebih. File diubah: MainActivity.kt, VideoResizer.kt.
 - **Batch 31** — Audit mendalam sektor kompresi video (diminta user).
   Ditemukan & DIPERBAIKI (paling krusial): `CompressorScreen` tombol
   "Batalkan" + back-saat-proses tidak pernah benar-benar menghentikan

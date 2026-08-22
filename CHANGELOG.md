@@ -1,5 +1,35 @@
 # Changelog
 
+## Batch 32: Fix ASSUMED_FPS hardcoded — probe fps asli source utk target bitrate kompresi
+
+Lanjutan audit kompresi video (Batch 31 Pending Queue #1). Formula target
+bitrate H.265 di Compressor tab (`bits-per-pixel-per-frame × fps`) selama
+ini selalu pakai `ASSUMED_FPS = 30` hardcoded, apapun fps asli source.
+Video 60fps (rekaman aksi/slow-mo umum di HP modern) jadinya dikompres
+dengan bitrate yang sebenarnya dihitung untuk setengah frame-rate-nya —
+kualitas per-frame turun lebih dari yang dijanjikan preset "Rekomendasi"/
+"Maksimal". Video 24fps sebaliknya dapat bitrate lebih besar dari perlu.
+
+**Fix:**
+- `CompressorScreen.loadSourceInfo()` sekarang probe fps asli lewat
+  `android.media.MediaExtractor` + `MediaFormat.KEY_FRAME_RATE` pada video
+  track pertama yang ditemukan. Sengaja BUKAN
+  `MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE` — key itu cuma
+  terisi untuk video slow-motion (capture rate ≠ playback rate), null di
+  video normal.
+- `CompressSourceInfo` dan `CompressRequest` dapat field baru `fps`/
+  `sourceFps: Int`. 0 = gagal probe → fallback ke `ASSUMED_FPS` (perilaku
+  lama, tidak berubah untuk kasus ini).
+- `computeCompressTargetBitrateBps` (VideoResizer.kt, dipakai saat export
+  sungguhan) dan `estimateCompressedSizeBytes` (dipakai preview
+  before/after di UI) sama-sama pakai fps asli ini sekarang — preview yang
+  ditampilkan ke user sebelum menekan "Kompres Video" jadi akurat sesuai
+  hasil sebenarnya, bukan cuma export-nya saja yang benar.
+
+File diubah: `MainActivity.kt`, `VideoResizer.kt`. Pending Queue tersisa
+(estimasi audio 128kbps flat; dialog konfirmasi back-saat-proses) — lihat
+PROJECT_STATE.md.
+
 ## Batch 31: Audit kompresi video — fix Transformer.cancel() & foreground service di CompressorScreen
 
 Audit mendalam sektor kompresi video atas permintaan user, menuju "100%

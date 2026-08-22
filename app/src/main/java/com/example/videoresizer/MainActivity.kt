@@ -4158,8 +4158,8 @@ private fun GifScreen(
     }
 }
 
-/** Metadata probed for the picked source video: duration/dimensions (same as every other screen) plus its file size in bytes, needed only here to estimate/cap the compressed output size. */
-private data class CompressSourceInfo(val durationMs: Long, val width: Int, val height: Int, val sizeBytes: Long)
+/** Metadata probed for the picked source video: duration/dimensions (same as every other screen) plus its file size in bytes and real fps, needed only here to estimate/cap the compressed output size. */
+private data class CompressSourceInfo(val durationMs: Long, val width: Int, val height: Int, val sizeBytes: Long, val fps: Int)
 
 /**
  * Compressor tab: re-encodes a whole video (optionally trimmed) as H.265 at
@@ -4184,6 +4184,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
     var sourceWidth by remember { mutableIntStateOf(0) }
     var sourceHeight by remember { mutableIntStateOf(0) }
     var sourceSizeBytes by remember { mutableLongStateOf(0L) }
+    var sourceFps by remember { mutableIntStateOf(0) }
     var trimRange by remember { mutableStateOf(0f..1f) }
     var filmstrip by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     var level by remember { mutableStateOf(CompressionLevel.RECOMMENDED) }
@@ -4206,7 +4207,10 @@ private fun CompressorScreen(onBack: () -> Unit) {
     var showVideoPicker by remember { mutableStateOf(false) }
 
     // Same duration/width/height probe every other screen uses, plus the
-    // source file's own size (via its AssetFileDescriptor length) which
+    // source file's own size (via its AssetFileDescriptor length) and real
+    // fps (Batch 32 — via MediaExtractor's video track MediaFormat, since
+    // MediaMetadataRetriever has no reliable "playback fps" key; its
+    // CAPTURE_FRAMERATE key is for slow-mo capture rate, not this), which
     // only this screen needs, to estimate/cap the compressed output size.
     suspend fun loadSourceInfo(uri: Uri): CompressSourceInfo? = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
@@ -4218,7 +4222,27 @@ private fun CompressorScreen(onBack: () -> Unit) {
             val size = runCatching {
                 context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
             }.getOrNull() ?: -1L
-            if (d > 0 && size > 0) CompressSourceInfo(d, w, h, size) else null
+            // 0 = "couldn't probe" — computeCompressTargetBitrateBps /
+            // estimateCompressedSizeBytes both fall back to ASSUMED_FPS.
+            val fps = runCatching {
+                val extractor = android.media.MediaExtractor()
+                try {
+                    extractor.setDataSource(context, uri, null)
+                    var result = 0
+                    for (i in 0 until extractor.trackCount) {
+                        val format = extractor.getTrackFormat(i)
+                        val mime = format.getString(android.media.MediaFormat.KEY_MIME) ?: continue
+                        if (mime.startsWith("video/") && format.containsKey(android.media.MediaFormat.KEY_FRAME_RATE)) {
+                            result = format.getInteger(android.media.MediaFormat.KEY_FRAME_RATE)
+                            break
+                        }
+                    }
+                    result
+                } finally {
+                    extractor.release()
+                }
+            }.getOrNull() ?: 0
+            if (d > 0 && size > 0) CompressSourceInfo(d, w, h, size, fps) else null
         } catch (e: Exception) {
             null
         } finally {
@@ -4241,6 +4265,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                 sourceWidth = info.width
                 sourceHeight = info.height
                 sourceSizeBytes = info.sizeBytes
+                sourceFps = info.fps
                 trimRange = 0f..1f
             } else {
                 android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
@@ -4268,7 +4293,8 @@ private fun CompressorScreen(onBack: () -> Unit) {
             sourceFileSizeBytes = sourceSizeBytes,
             clipDurationMs = clipDurationMs,
             muteAudio = false,
-            level = level
+            level = level,
+            sourceFps = sourceFps
         )
     } else null
     // Same reasoning as source size: proportional slice of the whole
@@ -4423,6 +4449,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                                 sourceHeight = sourceHeight,
                                 sourceDurationMs = durationMs,
                                 sourceFileSizeBytes = sourceSizeBytes,
+                                sourceFps = sourceFps,
                                 trimStartMs = startMs,
                                 trimEndMs = endMs,
                                 level = level

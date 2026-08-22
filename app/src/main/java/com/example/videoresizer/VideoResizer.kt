@@ -186,7 +186,17 @@ enum class CompressionLevel(val label: String, val description: String, val targ
 
     companion object {
         val ENTRIES: List<CompressionLevel> = values().toList()
-        /** Nominal fps assumed by the bpp→bitrate formula below — CompressorScreen doesn't probe the source's actual frame rate since nothing else about this feature needs it. */
+        /**
+         * Fallback fps used by the bpp→bitrate formula ONLY when the
+         * source's real frame rate couldn't be probed (see
+         * [CompressRequest.sourceFps] — Batch 32 fix). Previously this was
+         * used unconditionally for every source regardless of its actual
+         * fps, which meant a 60fps source got a bitrate sized for half its
+         * real frame rate (visibly worse quality than the preset promised)
+         * and a 24fps source got more bitrate than it needed (bigger file
+         * than necessary). Kept as a named fallback, not deleted, since a
+         * source whose fps can't be read still needs *some* assumption.
+         */
         const val ASSUMED_FPS = 30
     }
 }
@@ -200,6 +210,15 @@ data class CompressRequest(
     /** Duration (ms) and file size (bytes) of the *whole original source file* — used only to estimate its current bitrate so compression never re-encodes above it. Not affected by trimStartMs/trimEndMs below. */
     val sourceDurationMs: Long,
     val sourceFileSizeBytes: Long,
+    /**
+     * Source video track's real frame rate (Batch 32), probed by
+     * [MainActivity]'s CompressorScreen via `MediaExtractor` +
+     * `MediaFormat.KEY_FRAME_RATE`. 0 or negative means "couldn't be
+     * probed" — [computeCompressTargetBitrateBps] falls back to
+     * [CompressionLevel.ASSUMED_FPS] in that case, same as the old
+     * unconditional behavior.
+     */
+    val sourceFps: Int = 0,
     val trimStartMs: Long = 0L,
     val trimEndMs: Long = 0L,
     val muteAudio: Boolean = false,
@@ -633,13 +652,17 @@ class VideoResizer(private val context: Context) {
 
     /**
      * Resolves the H.265 target bitrate for [compressInternal]: the
-     * chosen [CompressionLevel]'s own bits-per-pixel-per-frame target,
-     * capped so it never exceeds ~85% of the source's own estimated
-     * bitrate (see [estimateSourceBitrateBps]) — the actual guarantee
-     * that compressing an already-efficient source doesn't grow it.
+     * chosen [CompressionLevel]'s own bits-per-pixel-per-frame target
+     * multiplied by the source's REAL fps (Batch 32 — [request.sourceFps],
+     * falling back to [CompressionLevel.ASSUMED_FPS] only if it couldn't be
+     * probed), capped so it never exceeds ~85% of the source's own
+     * estimated bitrate (see [estimateSourceBitrateBps]) — the actual
+     * guarantee that compressing an already-efficient source doesn't grow
+     * it.
      */
     private fun computeCompressTargetBitrateBps(request: CompressRequest, w: Int, h: Int): Int {
-        val levelTargetBps = (w.toDouble() * h.toDouble() * CompressionLevel.ASSUMED_FPS * request.level.targetBitsPerPixelPerFrame).toLong()
+        val fps = if (request.sourceFps > 0) request.sourceFps else CompressionLevel.ASSUMED_FPS
+        val levelTargetBps = (w.toDouble() * h.toDouble() * fps * request.level.targetBitsPerPixelPerFrame).toLong()
         val sourceBps = estimateSourceBitrateBps(request)
         val cappedBps = if (sourceBps != null && sourceBps > 0) minOf(levelTargetBps, (sourceBps * 0.85).toLong()) else levelTargetBps
         return cappedBps.coerceIn(MIN_BITRATE_KBPS.toLong() * 1000, MAX_BITRATE_KBPS.toLong() * 1000).toInt()
@@ -792,13 +815,16 @@ class VideoResizer(private val context: Context) {
             sourceFileSizeBytes: Long,
             clipDurationMs: Long,
             muteAudio: Boolean,
-            level: CompressionLevel
+            level: CompressionLevel,
+            /** Real source fps (Batch 32) — see [CompressRequest.sourceFps]; 0/negative falls back to [CompressionLevel.ASSUMED_FPS], same as [computeCompressTargetBitrateBps]. */
+            sourceFps: Int = 0
         ): Long? {
             if (clipDurationMs <= 0) return null
             val w = if (sourceWidth % 2 != 0) sourceWidth + 1 else sourceWidth
             val h = if (sourceHeight % 2 != 0) sourceHeight + 1 else sourceHeight
             if (w <= 0 || h <= 0) return null
-            val levelTargetBps = (w.toDouble() * h.toDouble() * CompressionLevel.ASSUMED_FPS * level.targetBitsPerPixelPerFrame)
+            val fps = if (sourceFps > 0) sourceFps else CompressionLevel.ASSUMED_FPS
+            val levelTargetBps = (w.toDouble() * h.toDouble() * fps * level.targetBitsPerPixelPerFrame)
             val audioBps = if (muteAudio) 0.0 else 128_000.0
             val sourceVideoBps = if (sourceDurationMs > 0 && sourceFileSizeBytes > 0) {
                 (((sourceFileSizeBytes * 8.0) / (sourceDurationMs / 1000.0)) - audioBps).coerceAtLeast(0.0)
