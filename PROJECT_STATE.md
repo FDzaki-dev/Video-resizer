@@ -45,12 +45,7 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **Feedback pada tombol update aplikasi** (dan pola serupa di seluruh
-   sektor project): Batch 24 sudah menambah sedikit feedback tekstual saat
-   mengecek update ("Mengecek update…" + item ter-disable di menu), tapi
-   audit menyeluruh pola feedback (haptic/snackbar/loading-state) di
-   tombol-tombol lain (Compress/Batch/GIF/Studio/export) BELUM dikerjakan.
-2. **Dokumentasi repository wajib Bahasa Indonesia saja**: README.md dan
+1. **Dokumentasi repository wajib Bahasa Indonesia saja**: README.md dan
    CHANGELOG.md saat ini campur Bahasa Inggris (ditulis dari sesi-sesi
    sebelumnya). Perlu diterjemahkan penuh ke Bahasa Indonesia. Ini
    pekerjaan besar (README.md ~36KB, CHANGELOG.md ~52KB) — akan dikerjakan
@@ -58,6 +53,16 @@ architecture/quirk notes live in README.md.
    Strict Micro-Batching Rule (menghindari ZIP terpotong).
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 26** — Closed Pending Queue item 1 (feedback audit). Added
+  `LocalHapticFeedback` (`HapticFeedbackType.LongPress`) to the 5 highest-
+  value action points that had zero tactile feedback before: Resize CTA
+  (`ResizerScreen`), Batch start (`BatchScreen.startBatch()`), GIF convert
+  start (`GifScreen`), Compress start (`CompressorScreen`), and the
+  destructive delete-confirm in `StudioScreen`'s history list. Loading-
+  state coverage was already complete (all 4 processing screens already
+  had `isProcessing` + progress UI pre-existing) so no changes needed
+  there; snackbar/toast coverage for errors was also already present.
+  1 file touched (`MainActivity.kt`), within cap.
 - **Batch 25** — User request: fold every top-bar feature except Studio
   into the "More" overflow menu. `Compress`/`Batch export`/`Video ke GIF`
   IconButtons removed from `ResizerScreen`'s `TopAppBar` `actions` and

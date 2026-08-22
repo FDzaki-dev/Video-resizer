@@ -54,10 +54,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -328,6 +330,7 @@ private fun ResizerScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     // In-app updater (AppUpdater.kt / Batch 21). checkingUpdate drives the
     // top-bar icon's own tiny progress ring; updateResult drives the dialog
@@ -1409,6 +1412,7 @@ private fun ResizerScreen(
                                 return@Button
                             }
 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             isProcessing = true
                             resultMessage = null
                             outputFile = null
@@ -1697,6 +1701,7 @@ private fun queryDisplayName(context: android.content.Context, uri: Uri): String
 private fun BatchScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     var items by remember { mutableStateOf<List<BatchItem>>(emptyList()) }
     // Per-item preview thumbnail, keyed by Uri rather than added as a field
@@ -1837,6 +1842,7 @@ private fun BatchScreen(onBack: () -> Unit) {
             summaryMessage = "Penyimpanan hampir penuh (tersisa ${freeMb}MB). Hapus beberapa file dulu sebelum memproses batch."
             return
         }
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         isProcessing = true
         summaryMessage = null
         items = items.map { it.copy(status = BatchStatus.Waiting) }
@@ -3263,6 +3269,7 @@ private fun StudioScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     // PERF: VideoHistoryStore.getAll() parses a JSON array out of
     // SharedPreferences and sorts it — real, if small, CPU + I/O work.
@@ -3288,6 +3295,7 @@ private fun StudioScreen(
             text = { Text("Video dan file hasil resize akan dihapus permanen dan tidak bisa dikembalikan.") },
             confirmButton = {
                 TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     pendingDeleteEntry = null
                     scope.launch {
                         withContext(Dispatchers.IO) { VideoHistoryStore.deleteWithFiles(context, entry) }
@@ -3773,6 +3781,7 @@ private fun GifScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var durationMs by remember { mutableLongStateOf(0L) }
@@ -4008,6 +4017,7 @@ private fun GifScreen(
                     Button(
                         onClick = {
                             val uri = selectedUri ?: return@Button
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             isProcessing = true
                             progress = 0
                             message = null
@@ -4151,6 +4161,7 @@ private data class CompressSourceInfo(val durationMs: Long, val width: Int, val 
 private fun CompressorScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var durationMs by remember { mutableLongStateOf(0L) }
@@ -4365,6 +4376,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                     Button(
                         onClick = {
                             val uri = selectedUri ?: return@Button
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             isProcessing = true
                             progress = 0
                             message = null
