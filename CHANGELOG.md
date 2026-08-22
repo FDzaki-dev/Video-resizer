@@ -1,5 +1,64 @@
 # Changelog
 
+## Unreleased — Batch 19: New Compressor tab (on-device H.265 re-encode)
+
+New feature, no CI failure to fix this batch.
+
+- **`VideoResizer.kt`** (additive only — `ResizeRequest`/`resize()`/
+  `QualityOption` untouched):
+  - `CompressionLevel` enum (`RECOMMENDED`, `MAXIMUM`) — each carries a
+    bits-per-pixel-per-frame target tuned for H.265 to look visually
+    transparent at a much lower bitrate than the source's own codec
+    needed. Doc comment is deliberately explicit that this is *not*
+    literally lossless — no re-encode of an already-lossy source can be —
+    it's "no perceptible difference on a phone screen", the same honest
+    framing any CapCut/InShot-style "smart compress" feature relies on.
+  - `CompressRequest` data class — source identity + optional trim +
+    `CompressionLevel`, no aspect/resolution/watermark/caption fields.
+  - `VideoResizer.compress()` / `compressInternal()` — same
+    try/catch-wrapped, `Transformer.Listener` + progress-poll pattern as
+    `resize()`, but forces `TransformationRequest.setVideoMimeType(MimeTypes.VIDEO_H265)`
+    with `DefaultEncoderFactory.setEnableFallback(true)` (falls back to
+    whatever the device's encoder supports if there's no HEVC hardware
+    encoder). No crop/rotate/watermark/caption effects — only adds a
+    `Presentation` if the source's own width/height happen to be odd
+    (encoders need even dimensions).
+  - `computeCompressTargetBitrateBps()` / `estimateSourceBitrateBps()`
+    (private) — resolves the target bitrate from the chosen level, capped
+    at ~85% of the source's own estimated bitrate (file size ÷ duration,
+    minus an assumed 128kbps audio track) so an already-efficient source
+    is never re-encoded at a *higher* bitrate than it started with.
+  - `VideoResizer.estimateCompressedSizeBytes()` (companion, static) —
+    same formula as the real target-bitrate calc, callable from
+    `CompressorScreen` before an export starts for the before/after size
+    preview.
+- **`MainActivity.kt`**:
+  - `Screen.COMPRESSOR` added to the screen enum; `VideoResizerApp` renders
+    `CompressorScreen` as the same kind of full-screen overlay Batch/GIF/
+    Studio already use (stays composed underneath, nothing loses state).
+  - New top-bar `IconButton` (`Icons.Filled.Compress`, needs
+    `material-icons-extended` — already a dependency) next to
+    Batch/GIF/Studio's icons, wired through a new `onOpenCompressor`
+    param on `ResizerScreen`.
+  - New `CompressorScreen` composable (end of file): reuses
+    `VideoPickerScreen` for source pick, `VideoEditorPreview` for the
+    trim UI, `formatFileSize`/`extractVideoThumbnail`/`shareVideo`/
+    `openInGallery` — all already-private helpers in this same file, so
+    nothing needed a visibility change to `internal`. Shows a live
+    before/after size + "hemat ~N%" estimate as the level chip changes,
+    then a progress bar + Share/"Buka di Galeri" on completion, same UX
+    shape as GifScreen.
+  - Saves a Studio history entry with `kind = "COMPRESS"` — no
+    `VideoHistoryEntry` schema change, reuses existing fields (aspect/
+    resolution/rotation default to ORIGINAL/NONE since Compressor doesn't
+    touch any of those).
+- **Not done this batch** (see PROJECT_STATE.md's pending items): Studio's
+  "Edit ulang" doesn't yet have a COMPRESS-specific branch — reopening a
+  COMPRESS entry currently falls into the default (non-GIF) path and
+  reopens Resizer instead of Compressor. Deferred per the one-task-per-batch
+  rule rather than scope-creeping this batch into StudioScreen's routing.
+- **`app/build.gradle.kts`**: `semanticVersionName` `"1.18"` → `"1.19"`.
+
 ## Unreleased — Batch 18: Fix CI compile failure from Batch 17 (AnimatedVisibility receiver ambiguity)
 
 Real CI signal: `assembleRelease` → `compileReleaseKotlin FAILED`, one error.

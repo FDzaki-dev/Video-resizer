@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.BrandingWatermark
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Gif
@@ -76,7 +77,7 @@ import java.util.Locale
 import java.util.UUID
 
 private enum class ThemePreference { SYSTEM, LIGHT, DARK, MIDNIGHT_NEON, WARM_PAPER, MIDNIGHT_BLUE_GLASS }
-private enum class Screen { MAIN, STUDIO, BATCH, GIF }
+private enum class Screen { MAIN, STUDIO, BATCH, GIF, COMPRESSOR }
 
 class MainActivity : ComponentActivity() {
 
@@ -229,6 +230,7 @@ private fun VideoResizerApp(
             onOpenStudio = { screen = Screen.STUDIO },
             onOpenBatch = { screen = Screen.BATCH },
             onOpenGif = { screen = Screen.GIF },
+            onOpenCompressor = { screen = Screen.COMPRESSOR },
             isForeground = screen == Screen.MAIN,
             prefill = prefill,
             onPrefillConsumed = { prefill = null },
@@ -245,6 +247,11 @@ private fun VideoResizerApp(
                 onBack = { screen = Screen.MAIN },
                 prefill = gifPrefill,
                 onPrefillConsumed = { gifPrefill = null }
+            )
+        }
+        if (screen == Screen.COMPRESSOR) {
+            CompressorScreen(
+                onBack = { screen = Screen.MAIN }
             )
         }
         if (screen == Screen.STUDIO) {
@@ -309,6 +316,7 @@ private fun ResizerScreen(
     onOpenStudio: () -> Unit,
     onOpenBatch: () -> Unit,
     onOpenGif: () -> Unit,
+    onOpenCompressor: () -> Unit,
     isForeground: Boolean,
     prefill: PrefillSettings?,
     onPrefillConsumed: () -> Unit,
@@ -800,6 +808,9 @@ private fun ResizerScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenCompressor) {
+                        Icon(Icons.Filled.Compress, contentDescription = "Kompres video")
+                    }
                     IconButton(onClick = onOpenBatch) {
                         Icon(Icons.Filled.Layers, contentDescription = "Batch export")
                     }
@@ -3956,6 +3967,354 @@ private fun GifScreen(
                             Button(onClick = { shareGifFile(context, savedGifFile) }) { Text("Share") }
                             if (savedGalleryUri != null) {
                                 OutlinedButton(onClick = { openGifInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
+                            }
+                        }
+                    }
+                }
+                }
+            }
+        }
+    }
+    if (showVideoPicker) {
+        VideoPickerScreen(
+            onVideoSelected = { uri ->
+                showVideoPicker = false
+                handlePickedVideo(uri)
+            },
+            onCancel = { showVideoPicker = false }
+        )
+    }
+    }
+}
+
+/** Metadata probed for the picked source video: duration/dimensions (same as every other screen) plus its file size in bytes, needed only here to estimate/cap the compressed output size. */
+private data class CompressSourceInfo(val durationMs: Long, val width: Int, val height: Int, val sizeBytes: Long)
+
+/**
+ * Compressor tab: re-encodes a whole video (optionally trimmed) as H.265 at
+ * a much lower bitrate than the source needed for the same visual quality,
+ * shrinking the file with no visible quality loss for normal viewing — see
+ * [CompressionLevel]'s doc comment in VideoResizer.kt for the honest
+ * framing ("visually transparent", not literally lossless — no re-encode
+ * of an already-lossy video can be). Deliberately its own screen rather
+ * than folded into ResizerScreen's quality slider: this is a one-tap
+ * "just make it smaller" tool with no aspect/resolution/watermark/caption
+ * knobs to configure, closer in spirit to GifScreen than to ResizerScreen.
+ */
+@Composable
+private fun CompressorScreen(onBack: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var sourceWidth by remember { mutableIntStateOf(0) }
+    var sourceHeight by remember { mutableIntStateOf(0) }
+    var sourceSizeBytes by remember { mutableLongStateOf(0L) }
+    var trimRange by remember { mutableStateOf(0f..1f) }
+    var filmstrip by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    var level by remember { mutableStateOf(CompressionLevel.RECOMMENDED) }
+    var isProcessing by remember { mutableStateOf(false) }
+    var progress by remember { mutableIntStateOf(0) }
+    var resultFile by remember { mutableStateOf<File?>(null) }
+    var resultSizeBytes by remember { mutableLongStateOf(0L) }
+    var galleryUri by remember { mutableStateOf<Uri?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var activeJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var showVideoPicker by remember { mutableStateOf(false) }
+
+    // Same duration/width/height probe every other screen uses, plus the
+    // source file's own size (via its AssetFileDescriptor length) which
+    // only this screen needs, to estimate/cap the compressed output size.
+    suspend fun loadSourceInfo(uri: Uri): CompressSourceInfo? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            val d = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val size = runCatching {
+                context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
+            }.getOrNull() ?: -1L
+            if (d > 0 && size > 0) CompressSourceInfo(d, w, h, size) else null
+        } catch (e: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
+    fun handlePickedVideo(uri: Uri) {
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        resultFile = null
+        galleryUri = null
+        message = null
+        scope.launch {
+            val info = loadSourceInfo(uri)
+            if (info != null) {
+                selectedUri = uri
+                durationMs = info.durationMs
+                sourceWidth = info.width
+                sourceHeight = info.height
+                sourceSizeBytes = info.sizeBytes
+                trimRange = 0f..1f
+            } else {
+                android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    LaunchedEffect(selectedUri, durationMs) {
+        val uri = selectedUri
+        filmstrip = if (uri != null && durationMs > 0) {
+            withContext(Dispatchers.IO) { FilmstripExtractor.extract(context, uri, durationMs, count = 8) }
+        } else {
+            emptyList()
+        }
+    }
+
+    val startMs = (trimRange.start * durationMs).toLong()
+    val endMs = (trimRange.endInclusive * durationMs).toLong()
+    val clipDurationMs = (endMs - startMs).coerceAtLeast(0L)
+    val estimatedNewSizeBytes = if (selectedUri != null && clipDurationMs > 0) {
+        VideoResizer.estimateCompressedSizeBytes(
+            sourceWidth = sourceWidth,
+            sourceHeight = sourceHeight,
+            sourceDurationMs = durationMs,
+            sourceFileSizeBytes = sourceSizeBytes,
+            clipDurationMs = clipDurationMs,
+            muteAudio = false,
+            level = level
+        )
+    } else null
+    // Same reasoning as source size: proportional slice of the whole
+    // file's bytes for the trimmed range, so the "before" side of the
+    // before/after comparison reflects the clip being exported, not the
+    // whole source file, when a trim is applied.
+    val originalClipSizeBytes = if (durationMs > 0 && sourceSizeBytes > 0) {
+        (sourceSizeBytes * (clipDurationMs.toDouble() / durationMs.toDouble())).toLong()
+    } else 0L
+
+    // Same BackHandler reasoning as every other manual-state screen here.
+    androidx.activity.compose.BackHandler(enabled = true) {
+        if (isProcessing) activeJob?.cancel()
+        onBack()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Kompres Video") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            if (selectedUri == null || durationMs <= 0) {
+                VideoPickerCard(
+                    onPickClick = { showVideoPicker = true }
+                )
+            } else {
+                val currentUri = selectedUri
+                if (currentUri != null) {
+                VideoEditorPreview(
+                    uri = currentUri,
+                    sourceWidth = sourceWidth,
+                    sourceHeight = sourceHeight,
+                    durationMs = durationMs,
+                    filmstrip = filmstrip,
+                    trimRange = trimRange,
+                    isForeground = true,
+                    onTrimRangeChange = { trimRange = it },
+                    onPickDifferent = { showVideoPicker = true }
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Tingkat kompresi", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(CompressionLevel.ENTRIES) { opt ->
+                            FilterChip(
+                                selected = level == opt,
+                                onClick = { level = opt },
+                                label = { Text(opt.label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                    Text(
+                        level.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (estimatedNewSizeBytes != null && originalClipSizeBytes > 0) {
+                    val savedPercent = ((1.0 - estimatedNewSizeBytes.toDouble() / originalClipSizeBytes.toDouble()) * 100.0)
+                        .coerceIn(0.0, 99.0)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Ukuran asli", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(formatFileSize(originalClipSizeBytes), color = MaterialTheme.colorScheme.onBackground)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Perkiraan hasil", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(formatFileSize(estimatedNewSizeBytes), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                        Text(
+                            "Hemat sekitar ${savedPercent.roundToInt()}% — encode H.265, resolusi & kualitas tampilan tetap sama.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                if (isProcessing) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LinearProgressIndicator(
+                            progress = { progress / 100f },
+                            modifier = Modifier.fillMaxWidth().height(6.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Mengompres… $progress%", color = MaterialTheme.colorScheme.onBackground)
+                            OutlinedButton(onClick = {
+                                activeJob?.cancel()
+                                isProcessing = false
+                                message = "Dibatalkan."
+                            }) { Text("Batalkan") }
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            val uri = selectedUri ?: return@Button
+                            isProcessing = true
+                            progress = 0
+                            message = null
+                            resultFile = null
+                            galleryUri = null
+                            val id = UUID.randomUUID().toString()
+                            val outFile = File(context.cacheDir, "compressed_$id.mp4")
+                            val request = CompressRequest(
+                                sourceUri = uri,
+                                outputFile = outFile,
+                                sourceWidth = sourceWidth,
+                                sourceHeight = sourceHeight,
+                                sourceDurationMs = durationMs,
+                                sourceFileSizeBytes = sourceSizeBytes,
+                                trimStartMs = startMs,
+                                trimEndMs = endMs,
+                                level = level
+                            )
+                            activeJob = scope.launch {
+                                VideoResizer(context).compress(
+                                    request,
+                                    onProgress = { p -> progress = p },
+                                    onDone = { result ->
+                                        isProcessing = false
+                                        when (result) {
+                                            is ResizeResult.Success -> {
+                                                scope.launch {
+                                                    val (msg, pubUri, outSize) = withContext(Dispatchers.IO) {
+                                                        val displayName = result.outputFile.name
+                                                        val publicUri = PublicMovieExporter.publish(context, result.outputFile, displayName)
+                                                        val size = result.outputFile.length()
+                                                        val thumbDir = File(context.cacheDir, "thumbs").apply { mkdirs() }
+                                                        val thumbnailFile = File(thumbDir, "thumb_$id.jpg")
+                                                        if (extractVideoThumbnail(result.outputFile, thumbnailFile)) {
+                                                            VideoHistoryStore.add(
+                                                                context,
+                                                                VideoHistoryEntry(
+                                                                    id = id,
+                                                                    createdAt = System.currentTimeMillis(),
+                                                                    outputFilePath = result.outputFile.absolutePath,
+                                                                    thumbnailPath = thumbnailFile.absolutePath,
+                                                                    sourceUri = uri.toString(),
+                                                                    aspectRatioName = AspectRatioOption.ORIGINAL.name,
+                                                                    resolutionName = ResolutionOption.ORIGINAL.name,
+                                                                    rotationName = RotationOption.NONE.name,
+                                                                    muteAudio = false,
+                                                                    trimStartMs = startMs,
+                                                                    trimEndMs = endMs,
+                                                                    publicUri = publicUri?.toString(),
+                                                                    kind = "COMPRESS"
+                                                                )
+                                                            )
+                                                        }
+                                                        val savedPercent = if (originalClipSizeBytes > 0) {
+                                                            ((1.0 - size.toDouble() / originalClipSizeBytes.toDouble()) * 100.0).coerceIn(0.0, 99.0).roundToInt()
+                                                        } else 0
+                                                        val message = if (publicUri != null) {
+                                                            "Selesai. Tersimpan di Galeri > Movies > VideoResizer. Ukuran turun $savedPercent% (${formatFileSize(size)})."
+                                                        } else {
+                                                            "Selesai (${formatFileSize(size)}, turun $savedPercent%), tapi gagal disalin ke galeri publik. Tetap tersedia lewat tombol Share di bawah."
+                                                        }
+                                                        Triple(message, publicUri, size)
+                                                    }
+                                                    resultFile = result.outputFile
+                                                    resultSizeBytes = outSize
+                                                    galleryUri = pubUri
+                                                    message = msg
+                                                }
+                                            }
+                                            is ResizeResult.Failure -> {
+                                                message = "Gagal mengompres video. (Detail teknis: ${result.message})"
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        },
+                        enabled = clipDurationMs > 0,
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Kompres Video")
+                    }
+                }
+
+                message?.let { msg ->
+                    Text(msg, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground)
+                }
+
+                if (resultFile != null) {
+                    val savedFile = resultFile
+                    val savedGalleryUri = galleryUri
+                    if (savedFile != null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = { shareVideo(context, savedFile) }) { Text("Share") }
+                            if (savedGalleryUri != null) {
+                                OutlinedButton(onClick = { openInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
                             }
                         }
                     }

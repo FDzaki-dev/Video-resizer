@@ -1,5 +1,5 @@
 FILE_MANIFEST.txt — Video Resizer
-Generated: Batch 6, last updated Batch 9. Regenerate/update this file
+Generated: Batch 6, last updated Batch 19. Regenerate/update this file
 whenever files are added, removed, or renamed — it should always match
 `find . -type f` for real.
 Legend: [PROTECTED] = edit-parsial-only per user preferences; deleting or
@@ -27,11 +27,11 @@ app/src/main/
   AndroidManifest.xml                      [PROTECTED] android:name=".VideoResizerApp" (Batch 2), permissions, activity decl
 
 app/src/main/java/com/example/videoresizer/
-  MainActivity.kt                          [PROTECTED — MainActivity] all 4 screens (Resizer/Studio/Batch/GIF), Compose UI, theme picker; Batch 12: BatchScreen gained Flip/FrameRate/Target-Size, GIF entries in Studio history; Batch 13: ResizerScreen + GifScreen's single-video pick now opens VideoPickerScreen (in-app) instead of the OS Photo Picker — BatchScreen's multi-pick and both watermark pickers are unchanged/out of scope
+  MainActivity.kt                          [PROTECTED — MainActivity] all 5 screens (Resizer/Studio/Batch/GIF/Compressor), Compose UI, theme picker; Batch 12: BatchScreen gained Flip/FrameRate/Target-Size, GIF entries in Studio history; Batch 13: ResizerScreen + GifScreen's single-video pick now opens VideoPickerScreen (in-app) instead of the OS Photo Picker — BatchScreen's multi-pick and both watermark pickers are unchanged/out of scope; Batch 19: new CompressorScreen (Screen.COMPRESSOR) — on-device H.265 re-encode, no aspect/resolution/watermark UI, own top-bar icon
   VideoPickerScreen.kt                     (new, Batch 13) full-screen in-app video picker — MediaStore query, Videos/Folders tabs, list rows (thumbnail/name/duration/resolution/date/size), explicit "Batal" cancel
   VideoResizerApp.kt                       [PROTECTED — Application] installs CrashLogger.install() in onCreate (Batch 2)
   CrashLogger.kt                           uncaught-exception handler → MediaStore Documents/VideoResizer/logs/, FIFO 50 (Batch 2)
-  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay, flip/frame-rate/target-size (Batch 9)
+  VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay, flip/frame-rate/target-size (Batch 9); Batch 19: added compress()/CompressRequest/CompressionLevel — separate H.265 encode path, ResizeRequest/resize() untouched
   GifEncoder.kt                            (new, Batch 9) dependency-free GIF89a + LZW encoder
   GifExporter.kt                           (new, Batch 9) frame extraction + palette quantization + GIF orchestration, used by GifScreen
   ExportForegroundService.kt               foreground service wrapping VideoResizer for long exports

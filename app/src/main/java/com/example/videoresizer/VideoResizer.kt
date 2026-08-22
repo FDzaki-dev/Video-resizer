@@ -166,6 +166,46 @@ enum class FrameRateOption(val label: String, val fps: Int) {
     }
 }
 
+/**
+ * Quality target for [VideoResizer.compress] — the dedicated Compressor tab,
+ * as opposed to [QualityOption] which backs the Resizer screen's own
+ * bitrate slider. Both presets force the H.265/HEVC codec instead of
+ * whatever the source used: HEVC needs roughly half the bitrate of H.264
+ * for the same perceived quality, which is *where the size reduction
+ * actually comes from*. Re-encoding is inherently lossy — there is no such
+ * thing as a truly zero-quality-loss way to shrink an already-encoded
+ * video — so both presets are tuned to be visually transparent (no
+ * perceptible difference on a phone screen) rather than literally lossless,
+ * and [VideoResizer.compress] additionally never requests a bitrate higher
+ * than the source's own, so an already-efficient source is left alone
+ * instead of being blown back up.
+ */
+enum class CompressionLevel(val label: String, val description: String, val targetBitsPerPixelPerFrame: Double) {
+    RECOMMENDED("Rekomendasi", "Ukuran lebih kecil, kualitas nyaris tak terlihat beda", 0.06),
+    MAXIMUM("Maksimal", "Ukuran paling kecil, kualitas masih layak", 0.035);
+
+    companion object {
+        val ENTRIES: List<CompressionLevel> = values().toList()
+        /** Nominal fps assumed by the bpp→bitrate formula below — CompressorScreen doesn't probe the source's actual frame rate since nothing else about this feature needs it. */
+        const val ASSUMED_FPS = 30
+    }
+}
+
+/** Request for [VideoResizer.compress]. Deliberately separate from [ResizeRequest]: no aspect/resolution/watermark/caption knobs, just the source identity + an optional trim + a [CompressionLevel]. */
+data class CompressRequest(
+    val sourceUri: Uri,
+    val outputFile: File,
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    /** Duration (ms) and file size (bytes) of the *whole original source file* — used only to estimate its current bitrate so compression never re-encodes above it. Not affected by trimStartMs/trimEndMs below. */
+    val sourceDurationMs: Long,
+    val sourceFileSizeBytes: Long,
+    val trimStartMs: Long = 0L,
+    val trimEndMs: Long = 0L,
+    val muteAudio: Boolean = false,
+    val level: CompressionLevel = CompressionLevel.RECOMMENDED
+)
+
 data class ResizeRequest(
     val sourceUri: Uri,
     val outputFile: File,
@@ -400,6 +440,110 @@ class VideoResizer(private val context: Context) {
     }
 
     /**
+     * Compressor tab entry point — re-encodes [request.sourceUri] as H.265
+     * at the same resolution (no crop/aspect/watermark/caption pipeline),
+     * targeting a much smaller bitrate than H.264 needs for the same
+     * visual quality. See [CompressionLevel]'s doc comment for the honest
+     * "visually transparent, not literally lossless" framing. Same
+     * try/catch-wrapped pattern as [resize] so a synchronous setup failure
+     * (bad Uri, encoder rejects config before the async pipeline starts)
+     * surfaces as an ordinary [ResizeResult.Failure] instead of crashing.
+     */
+    fun compress(request: CompressRequest, onProgress: (Int) -> Unit, onDone: (ResizeResult) -> Unit): Transformer? {
+        return try {
+            compressInternal(request, onProgress, onDone)
+        } catch (e: Exception) {
+            onDone(ResizeResult.Failure(e.message ?: "Gagal memulai kompresi"))
+            null
+        }
+    }
+
+    private fun compressInternal(request: CompressRequest, onProgress: (Int) -> Unit, onDone: (ResizeResult) -> Unit): Transformer {
+        // Encoders generally require even dimensions — only reached for
+        // odd source dimensions, since no crop/resize is otherwise applied.
+        val w = if (request.sourceWidth % 2 != 0) request.sourceWidth + 1 else request.sourceWidth
+        val h = if (request.sourceHeight % 2 != 0) request.sourceHeight + 1 else request.sourceHeight
+        val videoEffects = mutableListOf<androidx.media3.common.Effect>()
+        if ((w != request.sourceWidth || h != request.sourceHeight) && w > 0 && h > 0) {
+            videoEffects.add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
+        }
+
+        val targetBitrateBps = computeCompressTargetBitrateBps(request, w, h)
+        val transformerBuilder = Transformer.Builder(context)
+            .setTransformationRequest(
+                androidx.media3.transformer.TransformationRequest.Builder()
+                    .setVideoMimeType(androidx.media3.common.MimeTypes.VIDEO_H265)
+                    .build()
+            )
+            .setEncoderFactory(
+                androidx.media3.transformer.DefaultEncoderFactory.Builder(context)
+                    .setRequestedVideoEncoderSettings(
+                        androidx.media3.transformer.VideoEncoderSettings.Builder()
+                            .setBitrate(targetBitrateBps)
+                            .build()
+                    )
+                    // A device without an H.265 hardware encoder falls back to
+                    // whatever DefaultEncoderFactory picks instead, same
+                    // safety net as [resize]'s bitrate path.
+                    .setEnableFallback(true)
+                    .build()
+            )
+
+        var mediaItemBuilder = MediaItem.Builder().setUri(request.sourceUri)
+        if (request.trimEndMs > request.trimStartMs) {
+            mediaItemBuilder = mediaItemBuilder.setClippingConfiguration(
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(request.trimStartMs)
+                    .setEndPositionMs(request.trimEndMs)
+                    .build()
+            )
+        }
+        val editedMediaItemBuilder = EditedMediaItem.Builder(mediaItemBuilder.build())
+            .setRemoveAudio(request.muteAudio)
+        if (videoEffects.isNotEmpty()) {
+            editedMediaItemBuilder.setEffects(Effects(emptyList(), videoEffects))
+        }
+        val editedMediaItem = editedMediaItemBuilder.build()
+
+        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        lateinit var transformer: Transformer
+        val progressHolder = androidx.media3.transformer.ProgressHolder()
+        val pollProgress = object : Runnable {
+            override fun run() {
+                val state = transformer.getProgress(progressHolder)
+                if (state == Transformer.PROGRESS_STATE_AVAILABLE) {
+                    onProgress(progressHolder.progress.coerceIn(0, 99))
+                }
+                if (state != Transformer.PROGRESS_STATE_NOT_STARTED) {
+                    mainHandler.postDelayed(this, 400)
+                }
+            }
+        }
+
+        transformer = transformerBuilder
+            .addListener(object : Transformer.Listener {
+                override fun onCompleted(composition: androidx.media3.transformer.Composition, exportResult: ExportResult) {
+                    mainHandler.removeCallbacksAndMessages(null)
+                    onDone(ResizeResult.Success(request.outputFile))
+                }
+
+                override fun onError(
+                    composition: androidx.media3.transformer.Composition,
+                    exportResult: ExportResult,
+                    exportException: ExportException
+                ) {
+                    mainHandler.removeCallbacksAndMessages(null)
+                    onDone(ResizeResult.Failure(exportException.message ?: "Export failed"))
+                }
+            })
+            .build()
+
+        transformer.start(editedMediaItem, request.outputFile.absolutePath)
+        mainHandler.post(pollProgress)
+        return transformer
+    }
+
+    /**
      * Builds the [OverlayEffect] that draws a static image (a watermark, or
      * a caption rendered to a bitmap by [buildCaptionOverlay]) on top of
      * every output frame at a fixed corner/position, scale, and opacity for
@@ -486,6 +630,34 @@ class VideoResizer(private val context: Context) {
 
     /** Small tuple purely to keep [buildWatermarkOverlay]'s anchor math on one readable line each. */
     private data class Quad(val a: Float, val b: Float, val c: Float, val d: Float)
+
+    /**
+     * Resolves the H.265 target bitrate for [compressInternal]: the
+     * chosen [CompressionLevel]'s own bits-per-pixel-per-frame target,
+     * capped so it never exceeds ~85% of the source's own estimated
+     * bitrate (see [estimateSourceBitrateBps]) — the actual guarantee
+     * that compressing an already-efficient source doesn't grow it.
+     */
+    private fun computeCompressTargetBitrateBps(request: CompressRequest, w: Int, h: Int): Int {
+        val levelTargetBps = (w.toDouble() * h.toDouble() * CompressionLevel.ASSUMED_FPS * request.level.targetBitsPerPixelPerFrame).toLong()
+        val sourceBps = estimateSourceBitrateBps(request)
+        val cappedBps = if (sourceBps != null && sourceBps > 0) minOf(levelTargetBps, (sourceBps * 0.85).toLong()) else levelTargetBps
+        return cappedBps.coerceIn(MIN_BITRATE_KBPS.toLong() * 1000, MAX_BITRATE_KBPS.toLong() * 1000).toInt()
+    }
+
+    /**
+     * Rough estimate of the *source* file's own video bitrate (bits/sec),
+     * from its total file size and duration minus an assumed 128kbps AAC
+     * audio track. Not exact (container overhead/VBR variance ignored) —
+     * it only needs to be good enough for a one-sided safety cap, not a
+     * precise figure.
+     */
+    private fun estimateSourceBitrateBps(request: CompressRequest): Long? {
+        if (request.sourceDurationMs <= 0 || request.sourceFileSizeBytes <= 0) return null
+        val totalBps = (request.sourceFileSizeBytes * 8.0) / (request.sourceDurationMs / 1000.0)
+        val audioBps = if (request.muteAudio) 0.0 else 128_000.0
+        return (totalBps - audioBps).toLong().coerceAtLeast(0L).takeIf { it > 0 }
+    }
 
     /**
      * Resolves the requested video-encoder bitrate in bits per second for
@@ -604,6 +776,37 @@ class VideoResizer(private val context: Context) {
             val videoBitrateBps = totalBitsPerSecond - audioBitrateBps
             if (videoBitrateBps <= 0) return null
             return (videoBitrateBps / 1000.0).toInt().coerceIn(MIN_BITRATE_KBPS, MAX_BITRATE_KBPS)
+        }
+
+        /**
+         * Estimated output size (bytes) for the Compressor tab's
+         * before/after preview — same formula [VideoResizer.compressInternal]
+         * itself uses to pick the real target bitrate, kept in the
+         * companion so CompressorScreen can call it before an export even
+         * starts (no VideoResizer instance/Context needed).
+         */
+        fun estimateCompressedSizeBytes(
+            sourceWidth: Int,
+            sourceHeight: Int,
+            sourceDurationMs: Long,
+            sourceFileSizeBytes: Long,
+            clipDurationMs: Long,
+            muteAudio: Boolean,
+            level: CompressionLevel
+        ): Long? {
+            if (clipDurationMs <= 0) return null
+            val w = if (sourceWidth % 2 != 0) sourceWidth + 1 else sourceWidth
+            val h = if (sourceHeight % 2 != 0) sourceHeight + 1 else sourceHeight
+            if (w <= 0 || h <= 0) return null
+            val levelTargetBps = (w.toDouble() * h.toDouble() * CompressionLevel.ASSUMED_FPS * level.targetBitsPerPixelPerFrame)
+            val audioBps = if (muteAudio) 0.0 else 128_000.0
+            val sourceVideoBps = if (sourceDurationMs > 0 && sourceFileSizeBytes > 0) {
+                (((sourceFileSizeBytes * 8.0) / (sourceDurationMs / 1000.0)) - audioBps).coerceAtLeast(0.0)
+            } else null
+            val cappedVideoBps = if (sourceVideoBps != null && sourceVideoBps > 0) minOf(levelTargetBps, sourceVideoBps * 0.85) else levelTargetBps
+            val finalVideoBps = cappedVideoBps.coerceIn(MIN_BITRATE_KBPS * 1000.0, MAX_BITRATE_KBPS * 1000.0)
+            val seconds = clipDurationMs / 1000.0
+            return ((finalVideoBps + audioBps) * seconds / 8.0).toLong()
         }
     }
 }

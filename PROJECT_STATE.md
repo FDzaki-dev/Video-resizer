@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 16**. This is the first-read file per the context
+Snapshot as of **Batch 19**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -8,10 +8,10 @@ architecture/quirk notes live in README.md.
 
 ## Current version
 - `versionName`/`versionCode` both dynamic since Batch 8: base semantic
-  label **`"1.18"`** (bumped from `1.17` this batch — `val
+  label **`"1.19"`** (bumped from `1.18` this batch — `val
   semanticVersionName` in `app/build.gradle.kts`, bump manually per feature
   batch) with `-build<n>` appended in CI; `versionCode` =
-  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.18` / `1013` for
+  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.19` / `1013` for
   any non-CI build.
 - ⚠️ **Version-history gap noticed this batch**: the uploaded project's
   `app/build.gradle.kts` was already at `1.16` — a full minor ahead of the
@@ -26,6 +26,26 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 19** — New **Compressor tab**: `Screen.COMPRESSOR` + a
+  `CompressorScreen` composable (own top-bar icon, `Icons.Filled.Compress`,
+  next to Batch/GIF/Studio), backed by a new `VideoResizer.compress()` path
+  that is entirely additive — `ResizeRequest`/`resize()` untouched. Picks a
+  video (in-app `VideoPickerScreen`, same as Resizer/GIF), lets the user
+  trim, pick **Rekomendasi** or **Maksimal** compression, shows a live
+  before/after size estimate, then re-encodes at the *same resolution* as
+  **H.265/HEVC** at a much lower bitrate than the source's own codec needs
+  for the same perceived quality — that's the actual mechanism behind
+  "smaller file, same visual quality": HEVC efficiency, not literally
+  lossless re-encoding (no re-encode of an already-lossy video can be
+  truly lossless — see `CompressionLevel`'s doc comment in
+  `VideoResizer.kt`). A safety cap (`estimateSourceBitrateBps`) means the
+  target bitrate is never set *above* ~85% of the source's own estimated
+  bitrate, so an already-efficient source is left alone instead of being
+  re-encoded larger. Saves to Studio history with `kind = "COMPRESS"`
+  (no `VideoHistoryEntry` schema change — reuses existing fields). Not
+  done this batch, see Known pending items below: "Edit ulang" on a
+  COMPRESS history entry currently reopens Resizer with default settings
+  rather than reopening Compressor.
 - **Batch 18** — Fixed real CI compile failure from Batch 17 (run confirmed
   failed, `compileReleaseKotlin FAILED`): `AnimatedVisibility(...)` at
   MainActivity.kt:2356 resolved to the `ColumnScope.AnimatedVisibility`
@@ -187,7 +207,27 @@ architecture/quirk notes live in README.md.
   unchanged. If multi-select ever needs the same list-style treatment,
   that's new scope, not an extension of the existing single-pick screen.
 
+## Defaults a new reader should know (cont'd — Compressor, Batch 19)
+- **Compressor is a separate pipeline call, not a mode of `resize()`** —
+  `VideoResizer.compress()`/`CompressRequest`/`CompressionLevel` are all
+  new, additive members; nothing about `ResizeRequest`/`resize()`/
+  `QualityOption` changed.
+- **Always forces H.265/HEVC** via `TransformationRequest.setVideoMimeType`
+  + `DefaultEncoderFactory.setEnableFallback(true)` — falls back to
+  whatever the device's encoder supports if no HEVC hardware encoder is
+  present, same fallback pattern `resize()`'s bitrate path already uses.
+- **No aspect/resolution/watermark/caption controls** — same resolution as
+  source in, source (or trimmed clip) out, just re-encoded smaller.
+
 ## Known pending items (not yet actioned)
+- 🟡 **Compressor "Edit ulang" not wired (Batch 19)** — a `kind =
+  "COMPRESS"` Studio history entry falls into `onEditAgain`'s default
+  (non-GIF) branch today, which reopens **Resizer** with mostly-default
+  settings rather than reopening **Compressor** with its trim/level
+  restored. Needs a `CompressPrefill` data class + a third branch in
+  `VideoResizerApp`'s `onEditAgain`, mirroring how `GifPrefill` already
+  works — deferred to keep Batch 19 to its one task (add the tab) per the
+  micro-batching rule.
 - 🟡 **"UI asimetris" on the trim editor — one concrete cause fixed
   (Batch 13b), may not be the whole story.** User's clarification was
   "semua bagian yang gak kelihatan simetris" (not specific enough to
