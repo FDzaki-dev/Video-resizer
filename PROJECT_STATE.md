@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 19**. This is the first-read file per the context
+Snapshot as of **Batch 20**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -26,6 +26,18 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 20** — Fixed real CI compile failure from Batch 19 (run confirmed
+  failed, `compileReleaseKotlin FAILED`, uploaded failure-log artifact
+  analyzed directly per this project's own "crash/failure log first"
+  convention): `CompressorScreen` in `MainActivity.kt` used `TopAppBar`/
+  `TopAppBarDefaults.topAppBarColors` (both experimental Material3 APIs)
+  without `@OptIn(ExperimentalMaterial3Api::class)` — same exact class of
+  gap Batch 16 fixed for `VideoPickerScreen`, just missed on this new
+  function. `GifScreen`, right above it in the same file, already carries
+  this annotation; `CompressorScreen` simply didn't get it copied over.
+  Fixed by adding `@OptIn(ExperimentalMaterial3Api::class)` directly above
+  `private fun CompressorScreen(...)`. No other code touched — semantic
+  version stays `1.19`, this is a pure compile fix.
 - **Batch 19** — New **Compressor tab**: `Screen.COMPRESSOR` + a
   `CompressorScreen` composable (own top-bar icon, `Icons.Filled.Compress`,
   next to Batch/GIF/Studio), backed by a new `VideoResizer.compress()` path

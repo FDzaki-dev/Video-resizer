@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Batch 20: Fix CI compile failure from Batch 19 (missing @OptIn on CompressorScreen)
+
+Real CI signal: `assembleRelease` → `compileReleaseKotlin FAILED`, three
+errors, all pointing at the same missing annotation.
+
+- **`MainActivity.kt`**: `CompressorScreen`'s `TopAppBar(...)` and
+  `TopAppBarDefaults.topAppBarColors(...)` calls (both experimental
+  Material3 APIs) had no `@OptIn(ExperimentalMaterial3Api::class)` on the
+  function — `GifScreen`, defined immediately above it, already carries
+  this exact annotation (every other Composable in this file using these
+  APIs does too), so this was the one gap, not a project-wide pattern
+  miss. Fixed by adding `@OptIn(ExperimentalMaterial3Api::class)` directly
+  above `private fun CompressorScreen(onBack: () -> Unit) {`. No behavior
+  change, no other lines touched.
+
 ## Unreleased — Batch 19: New Compressor tab (on-device H.265 re-encode)
 
 New feature, no CI failure to fix this batch.

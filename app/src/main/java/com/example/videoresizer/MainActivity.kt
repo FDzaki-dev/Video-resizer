@@ -4001,6 +4001,7 @@ private data class CompressSourceInfo(val durationMs: Long, val width: Int, val 
  * "just make it smaller" tool with no aspect/resolution/watermark/caption
  * knobs to configure, closer in spirit to GifScreen than to ResizerScreen.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompressorScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
