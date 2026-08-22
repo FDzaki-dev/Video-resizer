@@ -1,5 +1,25 @@
 # Changelog
 
+## Batch 40: Crash Fix — SecurityException saat "Buka di Galeri"
+
+### FIXED
+`MainActivity.kt`, `openInGallery` & `openGifInGallery` — crash log user
+(`crash_20260822_224435_*.txt`): `SecurityException: UID 10555 does not
+have permission to content://media/external/video/media/1000043486`,
+terjadi saat `context.startActivity(intent)`.
+- Root cause: kedua fungsi memanggil
+  `intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)` pada
+  `content://media/...` URI (MediaStore) yang bukan milik app (bukan
+  URI FileProvider app sendiri). Flag ini hanya valid dipakai app yang
+  memang berhak grant akses ke URI tsb; untuk URI MediaStore publik
+  sistem menolaknya → `SecurityException`.
+- Fix: hapus `addFlags(FLAG_GRANT_READ_URI_PERMISSION)` di kedua fungsi
+  (tidak diperlukan — `ACTION_VIEW` ke `content://media/...` publik
+  sudah bisa dibuka aplikasi Galeri tanpa grant tambahan). Tambah
+  `catch (e: SecurityException)` di kedua fungsi sbg fail-safe kedua
+  (toast pesan gagal, bukan crash).
+- File disentuh: `MainActivity.kt` (1 file).
+
 ## Batch 39: Eksekusi Prioritas 4 MICRO_POLISH_GUIDE.md — Kejelasan Estimasi Ukuran File
 
 ### CHANGED

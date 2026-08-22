@@ -3691,11 +3691,12 @@ private fun openInGallery(context: android.content.Context, uri: Uri) {
     try {
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "video/mp4")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(intent)
     } catch (e: android.content.ActivityNotFoundException) {
         android.widget.Toast.makeText(context, "Tidak ada aplikasi Galeri yang bisa membuka video ini.", android.widget.Toast.LENGTH_LONG).show()
+    } catch (e: SecurityException) {
+        android.widget.Toast.makeText(context, "Tidak bisa membuka video ini di Galeri.", android.widget.Toast.LENGTH_LONG).show()
     }
 }
 
@@ -3773,11 +3774,12 @@ private fun openGifInGallery(context: android.content.Context, uri: Uri) {
     try {
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "image/gif")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(intent)
     } catch (e: android.content.ActivityNotFoundException) {
         android.widget.Toast.makeText(context, "Tidak ada aplikasi Galeri yang bisa membuka GIF ini.", android.widget.Toast.LENGTH_LONG).show()
+    } catch (e: SecurityException) {
+        android.widget.Toast.makeText(context, "Tidak bisa membuka GIF ini di Galeri.", android.widget.Toast.LENGTH_LONG).show()
     }
 }
 

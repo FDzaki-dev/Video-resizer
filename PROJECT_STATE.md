@@ -44,6 +44,11 @@ Batch 35) sebelum mulai.
   permanent policy.
 
 ## Current version
+- **Batch 40 (crash fix):** `openInGallery` & `openGifInGallery` — hapus
+  `Intent.FLAG_GRANT_READ_URI_PERMISSION` (app tidak berhak grant permission
+  atas `content://media/...` URI milik MediaProvider → `SecurityException`
+  saat startActivity). Tambah `catch (e: SecurityException)` di kedua
+  fungsi sbg fail-safe. Lihat crash log `crash_20260822_224435_*.txt`.
 - **Fully automated since Batch 22 — see "Standing rules" above.**
   `versionCode = (VERSION_CODE_OVERRIDE ?: 13) + 1000`; `versionName =
   "$appVersionMajor.$VERSION_CODE_OVERRIDE"` (e.g. `"1.47"`) when running in
@@ -67,6 +72,15 @@ Batch 35) sebelum mulai.
 2. Prioritas 6–8 menyusul berurutan, lihat MICRO_POLISH_GUIDE.md untuk detail.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 40** — Crash fix [DONE]. User upload crash log:
+  `SecurityException: UID ... does not have permission to
+  content://media/external/video/media/...` saat tap "Buka di Galeri".
+  Root cause: `openInGallery`/`openGifInGallery` menambahkan
+  `FLAG_GRANT_READ_URI_PERMISSION` pada URI MediaStore yang bukan milik
+  app (bukan FileProvider) → sistem menolak grant → crash. Fix: hapus
+  flag tsb (tidak diperlukan utk public MediaStore URI), tambah
+  `catch (SecurityException)` di 2 fungsi sbg fail-safe kedua. File
+  disentuh: `MainActivity.kt` saja (1 file, sesuai micro-batch limit).
 - **Batch 39** — Eksekusi MICRO_POLISH_GUIDE.md **Prioritas 4** (Kejelasan
   Estimasi Ukuran File) [DONE]. Audit 3 tempat yang menampilkan estimasi
   ukuran/bitrate: (1) ResizerScreen "Perkiraan ukuran: ~X (kasar, hasil
