@@ -662,7 +662,7 @@ private fun ResizerScreen(
                 }) { Text("Batalkan proses", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showExitWhileProcessingConfirm = false }) { Text("Tetap di sini") }
+                TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showExitWhileProcessingConfirm = false }) { Text("Tetap di sini") }
             }
         )
     }
@@ -750,7 +750,7 @@ private fun ResizerScreen(
                 }) { Text("Ganti video") }
             },
             dismissButton = {
-                TextButton(onClick = { showChangeVideoConfirm = false }) { Text("Batal") }
+                TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showChangeVideoConfirm = false }) { Text("Batal") }
             }
         )
     }
@@ -852,11 +852,11 @@ private fun ResizerScreen(
                     // Bar is now just [Studio, More] — 2 icons, title has
                     // maximum room, and every other feature lives in one
                     // dropdown instead of being split across bar+menu.
-                    IconButton(onClick = onOpenStudio) {
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onOpenStudio() }) {
                         Icon(Icons.Filled.PhotoLibrary, contentDescription = "Studio")
                     }
                     Box {
-                        IconButton(onClick = { showMoreMenu = true }) {
+                        IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showMoreMenu = true }) {
                             if (checkingUpdate) {
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
@@ -867,17 +867,17 @@ private fun ResizerScreen(
                             DropdownMenuItem(
                                 text = { Text("Kompres video") },
                                 leadingIcon = { Icon(Icons.Filled.Compress, contentDescription = null) },
-                                onClick = { showMoreMenu = false; onOpenCompressor() }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showMoreMenu = false; onOpenCompressor() }
                             )
                             DropdownMenuItem(
                                 text = { Text("Batch export") },
                                 leadingIcon = { Icon(Icons.Filled.Layers, contentDescription = null) },
-                                onClick = { showMoreMenu = false; onOpenBatch() }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showMoreMenu = false; onOpenBatch() }
                             )
                             DropdownMenuItem(
                                 text = { Text("Video ke GIF") },
                                 leadingIcon = { Icon(Icons.Filled.Gif, contentDescription = null) },
-                                onClick = { showMoreMenu = false; onOpenGif() }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showMoreMenu = false; onOpenGif() }
                             )
                             androidx.compose.material3.HorizontalDivider()
                             DropdownMenuItem(
@@ -898,33 +898,33 @@ private fun ResizerScreen(
                             DropdownMenuItem(
                                 text = { Text("Tema: Dark") },
                                 leadingIcon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
-                                onClick = { onThemePrefChange(ThemePreference.DARK); showMoreMenu = false }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onThemePrefChange(ThemePreference.DARK); showMoreMenu = false }
                             )
                             DropdownMenuItem(
                                 text = { Text("Tema: Light") },
                                 leadingIcon = { Icon(Icons.Filled.LightMode, contentDescription = null) },
-                                onClick = { onThemePrefChange(ThemePreference.LIGHT); showMoreMenu = false }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onThemePrefChange(ThemePreference.LIGHT); showMoreMenu = false }
                             )
                             DropdownMenuItem(
                                 text = { Text("Tema: Ikuti sistem") },
                                 leadingIcon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
-                                onClick = { onThemePrefChange(ThemePreference.SYSTEM); showMoreMenu = false }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onThemePrefChange(ThemePreference.SYSTEM); showMoreMenu = false }
                             )
                             androidx.compose.material3.HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Tema: Midnight Neon") },
                                 leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
-                                onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_NEON); showMoreMenu = false }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onThemePrefChange(ThemePreference.MIDNIGHT_NEON); showMoreMenu = false }
                             )
                             DropdownMenuItem(
                                 text = { Text("Tema: Warm Paper") },
                                 leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
-                                onClick = { onThemePrefChange(ThemePreference.WARM_PAPER); showMoreMenu = false }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onThemePrefChange(ThemePreference.WARM_PAPER); showMoreMenu = false }
                             )
                             DropdownMenuItem(
                                 text = { Text("Tema: Midnight Blue Glass") },
                                 leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
-                                onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_BLUE_GLASS); showMoreMenu = false }
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onThemePrefChange(ThemePreference.MIDNIGHT_BLUE_GLASS); showMoreMenu = false }
                             )
                         }
                     }
@@ -1000,7 +1000,7 @@ private fun ResizerScreen(
                             FilterChip(
                                 selected = selectedSocialPreset == preset,
                                 onClick = {
-                                    selectedSocialPreset = preset
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                     selectedSocialPreset = preset
                                     aspectRatio = preset.aspectRatio
                                     resolution = ResolutionOption.CUSTOM
                                     customWidth = preset.width
@@ -1052,7 +1052,7 @@ private fun ResizerScreen(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
-                                    selectedSocialPreset = null
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                     selectedSocialPreset = null
                                     if (option == ResolutionOption.CUSTOM) {
                                         showCustomResDialog = true
                                     } else {
@@ -1113,7 +1113,7 @@ private fun ResizerScreen(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
-                                    selectedSocialPreset = null
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                     selectedSocialPreset = null
                                     if (option == QualityOption.CUSTOM) {
                                         showCustomBitrateDialog = true
                                     } else {
@@ -1138,7 +1138,7 @@ private fun ResizerScreen(
                             FilterChip(
                                 selected = false,
                                 onClick = {
-                                    selectedSocialPreset = null
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                     selectedSocialPreset = null
                                     showTargetSizeDialog = true
                                 },
                                 label = { Text("Ukuran target (MB)") },
@@ -1204,10 +1204,10 @@ private fun ResizerScreen(
                         }
                         if (watermarkUri == null) {
                             TextButton(onClick = {
-                                pickWatermarkLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pickWatermarkLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }) { Text("Pilih gambar") }
                         } else {
-                            TextButton(onClick = { watermarkUri = null }) {
+                            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); watermarkUri = null }) {
                                 Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Hapus")
@@ -1227,7 +1227,7 @@ private fun ResizerScreen(
                                     items(WatermarkPosition.ENTRIES) { pos ->
                                         FilterChip(
                                             selected = pos == watermarkPosition,
-                                            onClick = { watermarkPosition = pos },
+                                            onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); watermarkPosition = pos },
                                             label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) },
                                             colors = FilterChipDefaults.filterChipColors(
                                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -1287,7 +1287,7 @@ private fun ResizerScreen(
                             items(WatermarkPosition.ENTRIES) { pos ->
                                 FilterChip(
                                     selected = pos == captionPosition,
-                                    onClick = { captionPosition = pos },
+                                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); captionPosition = pos },
                                     label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -1553,12 +1553,12 @@ private fun ResizerScreen(
                                     // user's default Gallery/video app when we
                                     // successfully published to MediaStore.
                                     galleryUri?.let { uri ->
-                                        TextButton(onClick = { openInGallery(context, uri) }) {
+                                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); openInGallery(context, uri) }) {
                                             Text("Buka di Galeri")
                                         }
                                     }
                                     outputFile?.let { file ->
-                                        TextButton(onClick = { shareVideo(context, file) }) {
+                                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareVideo(context, file) }) {
                                             Text("Share")
                                         }
                                     }
@@ -1591,7 +1591,7 @@ private fun ResizerScreen(
                 onDismissRequest = { updateResult = null },
                 title = { Text("Cek update gagal") },
                 text = { Text(result.message) },
-                confirmButton = { TextButton(onClick = { updateResult = null }) { Text("OK") } }
+                confirmButton = { TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); updateResult = null }) { Text("OK") } }
             )
         }
         is AppUpdater.CheckResult.Available -> {
@@ -1641,7 +1641,7 @@ private fun ResizerScreen(
                     ) { Text("Unduh & Pasang") }
                 },
                 dismissButton = {
-                    TextButton(enabled = progress == null, onClick = { updateResult = null }) { Text("Nanti") }
+                    TextButton(enabled = progress == null, onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); updateResult = null }) { Text("Nanti") }
                 }
             )
         }
@@ -2020,6 +2020,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                 title = { Text("Batch Export", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         if (isProcessing) cancelBatch()
                         onBack()
                     }) {
@@ -2046,7 +2047,7 @@ private fun BatchScreen(onBack: () -> Unit) {
             )
 
             OutlinedButton(
-                onClick = { pickVideosLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pickVideosLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
                 enabled = !isProcessing,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -2154,7 +2155,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         FilterChip(
                             selected = selectedSocialPreset == preset,
                             onClick = {
-                                selectedSocialPreset = preset
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                 selectedSocialPreset = preset
                                 aspectRatio = preset.aspectRatio
                                 resolution = ResolutionOption.CUSTOM
                                 customWidth = preset.width
@@ -2205,7 +2206,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         FilterChip(
                             selected = isSelected,
                             onClick = {
-                                selectedSocialPreset = null
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                 selectedSocialPreset = null
                                 if (option == ResolutionOption.CUSTOM) showCustomResDialog = true else resolution = option
                             },
                             label = { Text(label) }
@@ -2247,7 +2248,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         FilterChip(
                             selected = isSelected,
                             onClick = {
-                                selectedSocialPreset = null
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                 selectedSocialPreset = null
                                 targetSizeMb = null
                                 if (option == QualityOption.CUSTOM) showCustomBitrateDialog = true else quality = option
                             },
@@ -2262,7 +2263,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         FilterChip(
                             selected = targetSizeMb != null,
                             onClick = {
-                                selectedSocialPreset = null
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);                                 selectedSocialPreset = null
                                 showTargetSizeDialog = true
                             },
                             label = { Text(targetSizeMb?.let { "${it} MB" } ?: "Ukuran target (MB)") }
@@ -2316,10 +2317,10 @@ private fun BatchScreen(onBack: () -> Unit) {
                     Text("Watermark / logo", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                     if (watermarkUri == null) {
                         TextButton(onClick = {
-                            pickWatermarkLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pickWatermarkLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }) { Text("Pilih gambar") }
                     } else {
-                        TextButton(onClick = { watermarkUri = null }) { Text("Hapus") }
+                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); watermarkUri = null }) { Text("Hapus") }
                     }
                 }
                 if (watermarkUri != null) {
@@ -2327,7 +2328,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         items(WatermarkPosition.ENTRIES) { pos ->
                             FilterChip(
                                 selected = pos == watermarkPosition,
-                                onClick = { watermarkPosition = pos },
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); watermarkPosition = pos },
                                 label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) }
                             )
                         }
@@ -2349,7 +2350,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         items(WatermarkPosition.ENTRIES) { pos ->
                             FilterChip(
                                 selected = pos == captionPosition,
-                                onClick = { captionPosition = pos },
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); captionPosition = pos },
                                 label = { Text(pos.label, style = MaterialTheme.typography.labelSmall) }
                             )
                         }
@@ -2413,6 +2414,7 @@ private fun VideoEditorPreview(
     onPickDifferent: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val exoPlayer = remember(uri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(uri))
@@ -2533,6 +2535,7 @@ private fun VideoEditorPreview(
                 ) {
                     IconButton(
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (isPlaying) {
                                 exoPlayer.pause()
                             } else {
@@ -2723,7 +2726,7 @@ private fun VideoEditorPreview(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
-                TextButton(onClick = onPickDifferent) { Text("Ganti video") }
+                TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onPickDifferent() }) { Text("Ganti video") }
             }
         }
     }
@@ -2872,8 +2875,9 @@ private fun TrimHandle(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VideoPickerCard(onPickClick: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     Card(
-        onClick = onPickClick,
+        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onPickClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         shape = MaterialTheme.shapes.large,
@@ -2903,6 +2907,7 @@ private fun CustomResolutionDialog(
     onDismiss: () -> Unit,
     onSave: (Int, Int) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     // FIX: No Input Guard. 4K UHD is a hard ceiling — past this, the
     // hardware encoder on low-end devices becomes crash-prone.
     val maxWidth = 3840
@@ -2998,6 +3003,7 @@ private fun CustomResolutionDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     val w = widthValue
                     val h = heightValue
                     if (isValid && w != null && h != null) onSave(w, h)
@@ -3006,7 +3012,7 @@ private fun CustomResolutionDialog(
             ) { Text("Save") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
         }
     )
 }
@@ -3017,6 +3023,7 @@ private fun CustomBitrateDialog(
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var kbpsText by remember { mutableStateOf(initialKbps?.toString() ?: "") }
     val kbpsValue = kbpsText.toIntOrNull()
     val error = when {
@@ -3066,12 +3073,12 @@ private fun CustomBitrateDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { kbpsValue?.let { if (isValid) onSave(it) } },
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); kbpsValue?.let { if (isValid) onSave(it) } },
                 enabled = isValid
             ) { Text("Save") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
         }
     )
 }
@@ -3089,6 +3096,7 @@ private fun TargetSizeDialog(
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var sizeText by remember { mutableStateOf("") }
     val sizeValue = sizeText.toDoubleOrNull()
     val computedKbps = if (sizeValue != null && sizeValue > 0.0 && durationMs > 0) {
@@ -3160,12 +3168,12 @@ private fun TargetSizeDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { computedKbps?.let(onSave) },
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); computedKbps?.let(onSave) },
                 enabled = computedKbps != null
             ) { Text("Save") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
         }
     )
 }
@@ -3183,6 +3191,7 @@ private fun BatchTargetSizeDialog(
     onDismiss: () -> Unit,
     onSave: (Double) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var sizeText by remember { mutableStateOf(initialMb?.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() } ?: "") }
     val sizeValue = sizeText.toDoubleOrNull()
     val isValid = sizeValue != null && sizeValue > 0.0
@@ -3224,12 +3233,12 @@ private fun BatchTargetSizeDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { sizeValue?.let(onSave) },
+                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); sizeValue?.let(onSave) },
                 enabled = isValid
             ) { Text("Save") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
         }
     )
 }
@@ -3243,6 +3252,7 @@ private fun <T> OptionSection(
     selected: T,
     onSelect: (T) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -3250,7 +3260,7 @@ private fun <T> OptionSection(
                 val isSelected = option == selected
                 FilterChip(
                     selected = isSelected,
-                    onClick = { onSelect(option) },
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(option) },
                     label = { Text(labelOf(option)) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -3308,7 +3318,7 @@ private fun StudioScreen(
                 }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeleteEntry = null }) { Text("Batal") }
+                TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pendingDeleteEntry = null }) { Text("Batal") }
             }
         )
     }
@@ -3333,7 +3343,7 @@ private fun StudioScreen(
             TopAppBar(
                 title = { Text("Studio", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onBack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -3423,6 +3433,7 @@ private fun StudioEntryCard(
     onOpenInGallery: (() -> Unit)?,
     onDelete: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var thumb by remember(entry.id) { mutableStateOf<Bitmap?>(null) }
     LaunchedEffect(entry.id) {
         thumb = withContext(Dispatchers.IO) {
@@ -3545,12 +3556,12 @@ private fun StudioEntryCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = onEditAgain, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Edit ulang") }
+                    TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onEditAgain() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Edit ulang") }
                     if (onOpenInGallery != null) {
-                        TextButton(onClick = onOpenInGallery, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Galeri") }
+                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onOpenInGallery() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Galeri") }
                     }
-                    TextButton(onClick = onShare, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Share") }
-                    IconButton(onClick = onDelete) {
+                    TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onShare() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Share") }
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDelete() }) {
                         Icon(Icons.Filled.Delete, contentDescription = "Hapus", tint = MaterialTheme.colorScheme.error)
                     }
                 }
@@ -3908,7 +3919,7 @@ private fun GifScreen(
             TopAppBar(
                 title = { Text("Video ke GIF") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onBack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -3956,7 +3967,7 @@ private fun GifScreen(
                         items(listOf(5, 10, 15)) { f ->
                             FilterChip(
                                 selected = fps == f,
-                                onClick = { fps = f },
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); fps = f },
                                 label = { Text("$f fps") },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -3975,7 +3986,7 @@ private fun GifScreen(
                         items(listOf(240, 360, 480)) { w ->
                             FilterChip(
                                 selected = targetWidth == w,
-                                onClick = { targetWidth = w },
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); targetWidth = w },
                                 label = { Text("${w}px") },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -4124,9 +4135,9 @@ private fun GifScreen(
                     val savedGalleryUri = galleryUri
                     if (savedGifFile != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { shareGifFile(context, savedGifFile) }) { Text("Share") }
+                            Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareGifFile(context, savedGifFile) }) { Text("Share") }
                             if (savedGalleryUri != null) {
-                                OutlinedButton(onClick = { openGifInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
+                                OutlinedButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); openGifInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
                             }
                         }
                     }
@@ -4271,7 +4282,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Kompres Video") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onBack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -4313,7 +4324,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                         items(CompressionLevel.ENTRIES) { opt ->
                             FilterChip(
                                 selected = level == opt,
-                                onClick = { level = opt },
+                                onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); level = opt },
                                 label = { Text(opt.label) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -4476,9 +4487,9 @@ private fun CompressorScreen(onBack: () -> Unit) {
                     val savedGalleryUri = galleryUri
                     if (savedFile != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { shareVideo(context, savedFile) }) { Text("Share") }
+                            Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareVideo(context, savedFile) }) { Text("Share") }
                             if (savedGalleryUri != null) {
-                                OutlinedButton(onClick = { openInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
+                                OutlinedButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); openInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
                             }
                         }
                     }

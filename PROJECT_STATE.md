@@ -53,6 +53,30 @@ architecture/quirk notes live in README.md.
    Strict Micro-Batching Rule (menghindari ZIP terpotong).
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 29** — User explicitly requested 100% haptic coverage ("Semua
+  tombol (100%). selama gak menganggu UX!!") after being asked
+  action-only vs full. Extended from 13 → 75 haptic call sites, covering
+  every remaining `onClick` in `MainActivity.kt`: navigation (back
+  buttons ×3, Studio icon, More-menu open/items, theme picks), all
+  selection chips (resolution/quality/preset/mode/aspect-ratio via
+  `OptionSection`, watermark position, caption position, fps, GIF width,
+  compress level), dialog Save/Cancel (4 dialogs: CustomResolution,
+  CustomBitrate, TargetSize, BatchTargetSize), dismiss buttons (Batal/
+  Nanti/OK/Tetap-di-sini), share/gallery buttons (Resizer/GIF/Compressor
+  results + Studio card), watermark pick/remove, play/pause toggle,
+  "Ganti video", empty-state "Tap to choose a video" card, and Studio's
+  edit-again/delete-icon. Used two tiers: `LongPress` (already
+  established, kept for destructive/action-start — 13 sites) and new
+  `TextHandleMove` (lighter, for selection/navigation/dismiss — 62 sites)
+  so frequent light taps don't feel as heavy as starting an export or
+  confirming a delete. Composables that didn't already have `haptic` in
+  scope (`OptionSection`, `VideoEditorPreview`, `VideoPickerCard`,
+  `CustomResolutionDialog`, `CustomBitrateDialog`, `TargetSizeDialog`,
+  `BatchTargetSizeDialog`, `StudioEntryCard`) each got their own
+  `val haptic = LocalHapticFeedback.current`. Added 2 new imports
+  (`HapticFeedbackType`, `LocalHapticFeedback`). Coverage is now
+  genuinely 100% of interactive taps in the file — no further pending
+  item in this category. 1 file touched (`MainActivity.kt`).
 - **Batch 28** — Fixed audit gap user caught ("termasuk tombol update juga
   gak??" — answer was no). Added haptic to the 2 remaining update-flow
   action buttons missed in Batch 27's classification: "Cek update"
