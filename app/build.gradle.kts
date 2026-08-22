@@ -24,21 +24,21 @@ android {
         // (1000 + the old versionCode 13) for any build not running in this
         // CI (e.g. Android Studio), so local builds still work with no env
         // var set.
-        versionCode = System.getenv("VERSION_CODE_OVERRIDE")?.toIntOrNull() ?: 1013
-        // The base semantic label, bumped manually per feature batch — this
-        // is the literal .github/workflows/build.yml's "Locate APK" step
-        // greps for, so keep this exact `val name = "..."` shape if it's
-        // ever touched again.
-        val semanticVersionName = "1.19"
-        // versionName itself is now fully dynamic too (Batch 8): appends
-        // "-build<n>" using the same VERSION_CODE_OVERRIDE env var
-        // versionCode reads above, so a device's Settings > App info shows
-        // exactly which CI run produced the installed APK — not just the
-        // human milestone label, which alone couldn't distinguish e.g. this
-        // batch's build from the previous one if both happened to land
-        // between semanticVersionName bumps. Falls back to the plain label
-        // with no suffix for any non-CI build (no env var set).
-        versionName = System.getenv("VERSION_CODE_OVERRIDE")?.let { "$semanticVersionName-build$it" } ?: semanticVersionName
+        val ciBuildNumber = System.getenv("VERSION_CODE_OVERRIDE")?.toIntOrNull()
+        versionCode = (ciBuildNumber ?: 13) + 1000
+        // AUTOMATED VERSIONING (Batch 22 — standing rule, see
+        // PROJECT_STATE.md "Automated versioning rule"): versionName no
+        // longer has any hand-maintained per-batch literal to forget to
+        // bump. `appVersionMajor` is the ONE constant left here, and it's
+        // intentionally not a routine step — only touched for a deliberate
+        // breaking/milestone release, never as part of normal batch work.
+        // .github/workflows/build.yml's tag/APK-name logic computes the
+        // exact same "1.$GITHUB_RUN_NUMBER" string independently in bash
+        // (not by grepping this file) — if appVersionMajor is ever
+        // deliberately bumped, update the matching literal there too (both
+        // sites carry a cross-reference comment).
+        val appVersionMajor = 1
+        versionName = if (ciBuildNumber != null) "$appVersionMajor.$ciBuildNumber" else "$appVersionMajor.0-dev"
     }
 
     // IMPORTANT: this keystore (release.keystore, committed at the project root)

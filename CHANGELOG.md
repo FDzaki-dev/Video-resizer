@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased — Batch 22: Automated versioning (standing rule — no more manual version bumps, ever)
+
+Per explicit user instruction, permanently enshrined as a standing rule in
+`PROJECT_STATE.md` ("Standing rules" section, applies to all future
+sessions without exception): version bump/name must be automatic from
+GitHub CI, never manual, to eliminate the whole class of "forgot to bump"
+bugs (the Batch 12 version-history gap being the concrete precedent).
+
+`app/build.gradle.kts`: removed the hand-maintained `semanticVersionName`
+literal (`"1.19"` as of Batch 20) entirely. `versionName` is now computed
+as `"$appVersionMajor.$VERSION_CODE_OVERRIDE"` — fully derived from
+`$GITHUB_RUN_NUMBER`, same source `versionCode` already used since Batch 7.
+`appVersionMajor` (currently `1`) is the one remaining manual constant,
+explicitly scoped to deliberate breaking/milestone bumps only — never
+routine batch work.
+
+`.github/workflows/build.yml`: both steps that used to `grep
+'semanticVersionName = '` out of the gradle file (Locate APK,
+Prepare-failure-log-name) now compute `VERSION_NAME="1.${GITHUB_RUN_NUMBER}"`
+directly in bash, cross-referenced by comment with the gradle constant so
+a future deliberate major bump touches both sites together. Tag format
+(`v<versionName>-build<n>`) is unchanged, so `AppUpdater.kt`'s
+`Regex("build(\\d+)")` parser (Batch 21) needed no changes.
+
+2 files touched (`app/build.gradle.kts`, `.github/workflows/build.yml`) —
+Strict Micro-Batching cap.
+
+## Unreleased — Batch 21: In-app updater (GitHub Releases, streamed APK download + install)
+
+New `AppUpdater.kt`: `check()` calls the GitHub Releases API for
+`FDzaki-dev/Video-resizer`, parses the `-build<N>` suffix off the latest
+release tag and compares it (as `1000+N`) against the installed
+`versionCode` — reuses the exact numbering `app/build.gradle.kts` and
+`.github/workflows/build.yml` already establish, no new "latest version"
+source of truth. `download()` streams the APK asset chunk-by-chunk to
+`cacheDir/updates/update.apk` via `HttpURLConnection` (15s connect / 20s
+read timeout, `followRedirects(true)` for the S3/CDN 302, optional
+`Authorization: Bearer` header support though unused for this public repo)
+— never loads the whole APK into memory. `install()` reuses the existing
+`FileProvider` authority to launch the system package installer;
+`canInstall()`/`requestInstallPermission()` handle the API 26+
+"install unknown apps" AppOps gate via `ACTION_MANAGE_UNKNOWN_APP_SOURCES`.
+
+`MainActivity.kt`: `ResizerScreen`'s top bar gets a new `SystemUpdate`
+icon button (shows a small spinner while checking) and an `AlertDialog`
+covering all three `AppUpdater.CheckResult` states — Available (release
+notes + "Unduh & Pasang" with a live progress bar), UpToDate (auto-dismiss,
+no dialog shown), Error (message + OK).
+
+`AndroidManifest.xml` (edit-parsial): added `INTERNET` +
+`REQUEST_INSTALL_PACKAGES` permissions. No change to `file_paths.xml` —
+its existing `cache-path` already covers the new `cacheDir/updates/`
+output location.
+
+3 files touched total (`AppUpdater.kt` new, `MainActivity.kt`,
+`AndroidManifest.xml`) — Strict Micro-Batching cap for this batch.
+
 ## Unreleased — Batch 20: Fix CI compile failure from Batch 19 (missing @OptIn on CompressorScreen)
 
 Real CI signal: `assembleRelease` → `compileReleaseKotlin FAILED`, three

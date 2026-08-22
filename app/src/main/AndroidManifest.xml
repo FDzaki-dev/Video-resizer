@@ -6,6 +6,17 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- In-app updater (AppUpdater.kt): INTERNET to hit the GitHub Releases
+         API + download the APK asset; REQUEST_INSTALL_PACKAGES so the
+         resulting FileProvider VIEW intent can prompt "install this
+         update" without leaving the app. REQUEST_INSTALL_PACKAGES is a
+         special AppOps permission the user grants via the Settings screen
+         AppUpdater.requestInstallPermission() opens
+         (ACTION_MANAGE_UNKNOWN_APP_SOURCES) the first time it's needed,
+         same as any other sideloaded-APK install flow. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!--
          Foreground-service protection for long video exports (see
          ExportForegroundService.kt). Without FOREGROUND_SERVICE +

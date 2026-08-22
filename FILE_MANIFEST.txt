@@ -13,22 +13,23 @@ ROOT
   release.keystore                         [PROTECTED] signing keystore — NEVER delete/regenerate/gitignore
   .gitignore                               [PROTECTED]
   .gitattributes                           [PROTECTED] LF normalization + binary-safe rules for keystore/apk/images (Batch 14)
-  .github/workflows/build.yml              [PROTECTED] CI: assembleRelease + publish GitHub Release (Batch 5: unique tag/APK per run; Batch 15: Stale Run Guard aborts stale 'Re-run jobs' before build/release)
+  .github/workflows/build.yml              [PROTECTED] CI: assembleRelease + publish GitHub Release (Batch 5: unique tag/APK per run; Batch 15: Stale Run Guard aborts stale 'Re-run jobs' before build/release; Batch 22: VERSION_NAME computed directly as "1.${GITHUB_RUN_NUMBER}", no longer grepped from build.gradle.kts)
   README.md                                context: architecture notes, known quirks, operational status
   CHANGELOG.md                             context: full batch-by-batch history
   PROJECT_STATE.md                         context: current state snapshot (this batch's companion file)
   FILE_MANIFEST.txt                        this file
 
 app/
-  build.gradle.kts                         [PROTECTED] app module: deps (media3 1.4.1 since Batch 9, material-icons-extended already present), signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false; semanticVersionName 1.17 (Batch 13)
+  build.gradle.kts                         [PROTECTED] app module: deps (media3 1.4.1 since Batch 9, material-icons-extended already present), signingConfig, minifyEnabled=false, lint.checkReleaseBuilds=false; Batch 22: versionName fully automated ("$appVersionMajor.$VERSION_CODE_OVERRIDE") — no more hand-bumped semanticVersionName literal, see PROJECT_STATE.md Standing rules
   proguard-rules.pro                       R8 rules (inactive while isMinifyEnabled=false)
 
 app/src/main/
-  AndroidManifest.xml                      [PROTECTED] android:name=".VideoResizerApp" (Batch 2), permissions, activity decl
+  AndroidManifest.xml                      [PROTECTED] android:name=".VideoResizerApp" (Batch 2), permissions, activity decl; Batch 21: +INTERNET, +REQUEST_INSTALL_PACKAGES for in-app updater
 
 app/src/main/java/com/example/videoresizer/
-  MainActivity.kt                          [PROTECTED — MainActivity] all 5 screens (Resizer/Studio/Batch/GIF/Compressor), Compose UI, theme picker; Batch 12: BatchScreen gained Flip/FrameRate/Target-Size, GIF entries in Studio history; Batch 13: ResizerScreen + GifScreen's single-video pick now opens VideoPickerScreen (in-app) instead of the OS Photo Picker — BatchScreen's multi-pick and both watermark pickers are unchanged/out of scope; Batch 19: new CompressorScreen (Screen.COMPRESSOR) — on-device H.265 re-encode, no aspect/resolution/watermark UI, own top-bar icon
+  MainActivity.kt                          [PROTECTED — MainActivity] all 5 screens (Resizer/Studio/Batch/GIF/Compressor), Compose UI, theme picker; Batch 12: BatchScreen gained Flip/FrameRate/Target-Size, GIF entries in Studio history; Batch 13: ResizerScreen + GifScreen's single-video pick now opens VideoPickerScreen (in-app) instead of the OS Photo Picker — BatchScreen's multi-pick and both watermark pickers are unchanged/out of scope; Batch 19: new CompressorScreen (Screen.COMPRESSOR) — on-device H.265 re-encode, no aspect/resolution/watermark UI, own top-bar icon; Batch 21: ResizerScreen top bar gained a SystemUpdate icon button + AlertDialog wired to AppUpdater.kt (check/download/install)
   VideoPickerScreen.kt                     (new, Batch 13) full-screen in-app video picker — MediaStore query, Videos/Folders tabs, list rows (thumbnail/name/duration/resolution/date/size), explicit "Batal" cancel
+  AppUpdater.kt                            (new, Batch 21) in-app updater — GitHub Releases API check, streamed chunk-by-chunk APK download to cacheDir/updates/, FileProvider install handoff, canInstall()/requestInstallPermission() for the API 26+ unknown-sources AppOps gate; hardcoded OWNER="FDzaki-dev" REPO="Video-resizer"
   VideoResizerApp.kt                       [PROTECTED — Application] installs CrashLogger.install() in onCreate (Batch 2)
   CrashLogger.kt                           uncaught-exception handler → MediaStore Documents/VideoResizer/logs/, FIFO 50 (Batch 2)
   VideoResizer.kt                          core resize/export logic, Media3 Transformer setup, watermark + caption overlay, flip/frame-rate/target-size (Batch 9); Batch 19: added compress()/CompressRequest/CompressionLevel — separate H.265 encode path, ResizeRequest/resize() untouched

@@ -83,8 +83,13 @@ jobs:
         if: failure()
         id: failinfo
         run: |
-          VERSION_NAME=$(grep -m1 'semanticVersionName = ' app/build.gradle.kts | sed -E 's/.*semanticVersionName = "([^"]+)".*/\1/')
-          if [ -z "$VERSION_NAME" ]; then VERSION_NAME="unknown"; fi
+          # AUTOMATED VERSIONING (Batch 22): computed directly, matching
+          # app/build.gradle.kts's `appVersionMajor` constant exactly — no
+          # longer grepped from a hand-bumped literal in that file. If
+          # appVersionMajor is ever deliberately bumped there, update the
+          # "1" below to match (see the cross-reference comment at both
+          # sites).
+          VERSION_NAME="1.${GITHUB_RUN_NUMBER}"
           echo "log_name=log_fail_${VERSION_NAME}_${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
       # Failed-build counterpart to "Upload APK artifact" below: whenever any
@@ -109,26 +114,20 @@ jobs:
         run: |
           APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
           echo "Found APK at: $APK_PATH"
-          # BUG FIX: this used to always copy to a static "VideoResizer-release.apk"
-          # regardless of what version was actually built, so a downloaded artifact
-          # couldn't be told apart from any other version by its filename alone —
-          # VERSION_NAME is read straight out of build.gradle.kts's
-          # semanticVersionName (Batch 8: versionName itself is now a dynamic
-          # expression, not a plain string literal, since it appends
-          # "-buildN" — semanticVersionName is the one literal left to grep).
-          VERSION_NAME=$(grep -m1 'semanticVersionName = ' app/build.gradle.kts | sed -E 's/.*semanticVersionName = "([^"]+)".*/\1/')
-          # BUG FIX: every push used to tag/release as plain "v${VERSION_NAME}".
-          # Since versionName in app/build.gradle.kts isn't bumped on every
-          # single push (it's a deliberate per-feature-batch bump, not a
-          # per-commit one), two different pushes with the same versionName
-          # produced the SAME tag — which made softprops/action-gh-release
-          # edit the existing release in place (duplicated "Full Changelog"
-          # sections, silently replaced APK asset) instead of creating a new
-          # one, so there was no way to tell which build was actually running
-          # on a device or download a specific earlier one. The run number is
-          # a GitHub-guaranteed strictly-increasing counter per workflow, so
-          # appending it makes every tag/filename unique even when
-          # versionName is unchanged across several pushes in a row.
+          # AUTOMATED VERSIONING (Batch 22 — standing rule, see this repo's
+          # PROJECT_STATE.md "Automated versioning rule"): computed directly
+          # from $GITHUB_RUN_NUMBER, matching app/build.gradle.kts's
+          # `appVersionMajor` constant exactly instead of grepping a
+          # hand-bumped literal out of that file. Nothing here requires a
+          # manual per-batch bump ever again — the ONLY manual constant left
+          # in the whole scheme is `appVersionMajor` itself (deliberate
+          # breaking/milestone bumps only, never routine), and if it's ever
+          # changed the "1" below must be updated to match.
+          VERSION_NAME="1.${GITHUB_RUN_NUMBER}"
+          # Tag/filename still append -build<n> even though versionName
+          # already embeds the run number — kept for exact backward
+          # compatibility with AppUpdater.kt's `Regex("build(\\d+)")` tag
+          # parser (Batch 21), so that file didn't need touching this batch.
           RELEASE_TAG="v${VERSION_NAME}-build${GITHUB_RUN_NUMBER}"
           OUT_NAME="VideoResizer-v${VERSION_NAME}-build${GITHUB_RUN_NUMBER}-release.apk"
           echo "Versioned name: $OUT_NAME"

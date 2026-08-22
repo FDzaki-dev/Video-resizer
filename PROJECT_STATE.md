@@ -1,31 +1,86 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 20**. This is the first-read file per the context
+Snapshot as of **Batch 22**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
 architecture/quirk notes live in README.md.
 
+## Standing rules (permanent — read first, applies to every future session without exception)
+
+- **Automated versioning rule (added Batch 22).** `versionCode` AND
+  `versionName` are BOTH derived automatically from CI (`$GITHUB_RUN_NUMBER`
+  via `VERSION_CODE_OVERRIDE`) in `app/build.gradle.kts` — see "Current
+  version" below for the exact formula. **No session may ever reintroduce a
+  hand-bumped per-batch version literal** (the old `semanticVersionName =
+  "1.19"`-style pattern, bumped manually batch-to-batch, is retired for
+  good — it was the direct cause of the version-history gap noted in the
+  old Batch 12/20 entries below). The only manual version constant that
+  still exists anywhere is `appVersionMajor` in `app/build.gradle.kts`
+  (currently `1`) — touch it ONLY for a deliberate breaking/milestone
+  release, never as routine batch work, and if it IS deliberately changed,
+  the matching literal `"1"` in `.github/workflows/build.yml`'s two
+  `VERSION_NAME="1.${GITHUB_RUN_NUMBER}"` lines must be updated to match in
+  the same batch (both sites carry a cross-reference comment pointing at
+  each other and at this rule). This rule itself is not a batch-history
+  item and must not be treated as "resolved and removable" — it's a
+  permanent policy.
+
 ## Current version
-- `versionName`/`versionCode` both dynamic since Batch 8: base semantic
-  label **`"1.19"`** (bumped from `1.18` this batch — `val
-  semanticVersionName` in `app/build.gradle.kts`, bump manually per feature
-  batch) with `-build<n>` appended in CI; `versionCode` =
-  `1000 + $GITHUB_RUN_NUMBER`. Both fall back to plain `1.19` / `1013` for
-  any non-CI build.
-- ⚠️ **Version-history gap noticed this batch**: the uploaded project's
-  `app/build.gradle.kts` was already at `1.16` — a full minor ahead of the
-  `"1.14"` this file's own Batch 12 entry recorded. Something bumped it to
-  `1.15`/`1.16` without a matching CHANGELOG/PROJECT_STATE update. Not
-  investigated further — `1.16` was treated as ground truth and bumped
-  forward from there — but worth knowing this file's batch numbering isn't
-  100% guaranteed authoritative if a future discrepancy shows up again.
+- **Fully automated since Batch 22 — see "Standing rules" above.**
+  `versionCode = (VERSION_CODE_OVERRIDE ?: 13) + 1000`; `versionName =
+  "$appVersionMajor.$VERSION_CODE_OVERRIDE"` (e.g. `"1.47"`) when running in
+  CI, else `"$appVersionMajor.0-dev"` for any local/non-CI build.
+  `appVersionMajor` is currently `1`. Nothing here requires — or should
+  ever again receive — a manual per-batch bump.
+- Historical note (pre-Batch-22, kept for context only — NOT an active
+  issue): versionName used to be a hand-maintained `semanticVersionName`
+  literal bumped once per batch (last manual value was `"1.19"`, Batch 20).
+  A version-history gap was noticed in Batch 12 (uploaded project was a
+  full minor ahead of what PROJECT_STATE.md recorded) — this whole class of
+  bug is what the Batch 22 automation rule exists to permanently prevent.
 - Package: `com.example.videoresizer`, minSdk 24, targetSdk/compileSdk 34
 - AGP 8.4.0, Kotlin 1.9.24, Gradle 8.7 (no wrapper jar — see FILE_MANIFEST.txt)
 - **Media3: 1.4.1** (bumped from 1.3.1 this batch, see Batch 9 below).
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 22** — Automated versioning (standing rule, see above): removed
+  the hand-maintained `semanticVersionName` literal from
+  `app/build.gradle.kts` entirely. `versionName` is now
+  `"$appVersionMajor.$VERSION_CODE_OVERRIDE"`, fully derived from CI same
+  as `versionCode` already was. `.github/workflows/build.yml`'s two steps
+  that used to `grep` that literal out of the gradle file now compute
+  `VERSION_NAME="1.${GITHUB_RUN_NUMBER}"` directly in bash instead (kept
+  cross-referenced with the gradle constant via comments on both sides).
+  Release tag format unchanged (`v<versionName>-build<n>`, slightly
+  redundant now but kept byte-for-byte compatible with `AppUpdater.kt`'s
+  `Regex("build(\\d+)")` parser from Batch 21 — so that file needed zero
+  changes this batch). 2 protected files touched
+  (`app/build.gradle.kts`, `.github/workflows/build.yml`) — within cap.
+- **Batch 21** — New **in-app updater**: top bar gains a `SystemUpdate` icon
+  button (`ResizerScreen`, next to Compress/Batch/GIF/Studio) that hits
+  GitHub's Releases API (`GET /repos/FDzaki-dev/Video-resizer/releases/latest`)
+  via a new `AppUpdater.kt` — no new Gradle dependency, uses
+  `HttpURLConnection` + platform `org.json` instead of OkHttp/Retrofit for
+  one endpoint + one download. Compares the release tag's `-build<N>`
+  suffix against the installed `versionCode` (both already `1000+N` per
+  `app/build.gradle.kts`/`build.yml`'s existing scheme — no separate
+  "latest version" field needed). Shows an `AlertDialog` with release notes
+  + "Unduh & Pasang"; download streams chunk-by-chunk straight to
+  `cacheDir/updates/update.apk` (never `readBytes()` into RAM), explicit
+  15s connect / 20s read timeouts, `followRedirects(true)` for the
+  asset's S3/CDN 302, optional `Authorization: Bearer` header (blank/unused
+  today — public repo). Install hands off to the system installer via the
+  existing `FileProvider` authority (`file_paths.xml`'s `cache-path`
+  already covers `cacheDir`, no change needed) with an
+  `ACTION_VIEW`/`application/vnd.android.package-archive` intent; if
+  `canRequestPackageInstalls()` is false, opens
+  `ACTION_MANAGE_UNKNOWN_APP_SOURCES` first. New manifest permissions
+  `INTERNET` + `REQUEST_INSTALL_PACKAGES` (edit-parsial on the protected
+  `AndroidManifest.xml`). 3 files touched (`AppUpdater.kt` new,
+  `MainActivity.kt`, `AndroidManifest.xml`) — at the Strict Micro-Batching
+  cap.
 - **Batch 20** — Fixed real CI compile failure from Batch 19 (run confirmed
   failed, `compileReleaseKotlin FAILED`, uploaded failure-log artifact
   analyzed directly per this project's own "crash/failure log first"

@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -325,6 +326,16 @@ private fun ResizerScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // In-app updater (AppUpdater.kt / Batch 21). checkingUpdate drives the
+    // top-bar icon's own tiny progress ring; updateResult drives the dialog
+    // (null = nothing to show, dismissed by user or auto-cleared on
+    // UpToDate). downloadProgress is null while idle, -1f for indeterminate
+    // (server sent no Content-Length), 0f..1f while downloading.
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<AppUpdater.CheckResult?>(null) }
+    var downloadProgress by remember { mutableStateOf<Float?>(null) }
+    var downloadedApk by remember { mutableStateOf<File?>(null) }
 
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     // PERF: mutableStateOf<Long/Int>() boxes every value on write. These are
@@ -808,6 +819,23 @@ private fun ResizerScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            if (!checkingUpdate) {
+                                checkingUpdate = true
+                                scope.launch {
+                                    updateResult = AppUpdater.check(context)
+                                    checkingUpdate = false
+                                }
+                            }
+                        }
+                    ) {
+                        if (checkingUpdate) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = "Cek update")
+                        }
+                    }
                     IconButton(onClick = onOpenCompressor) {
                         Icon(Icons.Filled.Compress, contentDescription = "Kompres video")
                     }
@@ -1493,6 +1521,73 @@ private fun ResizerScreen(
             },
             onCancel = { showVideoPicker = false }
         )
+    }
+    // In-app updater dialog (AppUpdater.kt / Batch 21) — drawn at this same
+    // top level as VideoPickerScreen's overlay above, so it floats over
+    // everything regardless of which screen/sub-state is active underneath.
+    when (val result = updateResult) {
+        is AppUpdater.CheckResult.UpToDate -> {
+            LaunchedEffect(Unit) { updateResult = null }
+        }
+        is AppUpdater.CheckResult.Error -> {
+            AlertDialog(
+                onDismissRequest = { updateResult = null },
+                title = { Text("Cek update gagal") },
+                text = { Text(result.message) },
+                confirmButton = { TextButton(onClick = { updateResult = null }) { Text("OK") } }
+            )
+        }
+        is AppUpdater.CheckResult.Available -> {
+            val info = result.info
+            val progress = downloadProgress
+            AlertDialog(
+                onDismissRequest = { if (progress == null) { updateResult = null } },
+                title = { Text("Update tersedia: ${info.tagName}") },
+                text = {
+                    Column {
+                        if (progress == null) {
+                            if (info.releaseNotes.isNotBlank()) Text(info.releaseNotes)
+                        } else if (progress < 0f) {
+                            Text("Mengunduh…")
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        } else {
+                            Text("Mengunduh… ${(progress * 100).toInt()}%")
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = progress == null,
+                        onClick = {
+                            downloadProgress = -1f
+                            scope.launch {
+                                try {
+                                    val apk = AppUpdater.download(context, info) { p -> downloadProgress = p }
+                                    downloadedApk = apk
+                                    downloadProgress = null
+                                    updateResult = null
+                                    if (AppUpdater.canInstall(context)) {
+                                        AppUpdater.install(context, apk)
+                                    } else {
+                                        AppUpdater.requestInstallPermission(context)
+                                    }
+                                } catch (e: Exception) {
+                                    downloadProgress = null
+                                    updateResult = AppUpdater.CheckResult.Error(e.message ?: "Unduh gagal")
+                                }
+                            }
+                        }
+                    ) { Text("Unduh & Pasang") }
+                },
+                dismissButton = {
+                    TextButton(enabled = progress == null, onClick = { updateResult = null }) { Text("Nanti") }
+                }
+            )
+        }
+        null -> Unit
     }
     }
 }
