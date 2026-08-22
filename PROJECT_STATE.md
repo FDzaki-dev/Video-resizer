@@ -44,6 +44,16 @@ Batch 35) sebelum mulai.
   permanent policy.
 
 ## Current version
+- **Batch 42 (polish):** Navigasi antar-screen (Batch/GIF/Compressor/
+  Studio) sebelumnya `if (screen == Screen.X) { Screen(...) }` — instant
+  cut, nol animasi (inilah akar keluhan user "transisi terlalu cepat").
+  Diganti `AnimatedVisibility` bareng: slide-in dari kanan + fade
+  (`IOS_PUSH_MS = 350ms`) utk masuk, slide-out ke kanan + fade
+  (`IOS_POP_MS = 300ms`) utk keluar, easing `CubicBezierEasing(0.42,0,
+  0.58,1)` (ease-in-out, mendekati kurva push/pop `UINavigationController`
+  iOS). Konstanta `IosPushEasing`/`IOS_PUSH_MS`/`IOS_POP_MS` dipakai
+  konsisten di keempat screen (bukan cuma 1 tempat) — cek pakai
+  `grep "if (screen == Screen\."` = 0 hasil, semua sudah dikonversi.
 - **Batch 41 (feature):** Studio — sweep-select + fix delete visibility.
   1) `StudioEntryCard` delete `IconButton` dulu di dalam Row
   `horizontalScroll` bareng 3 text button ("Edit ulang/Galeri/Bagikan") →
@@ -84,6 +94,19 @@ Batch 35) sebelum mulai.
 2. Prioritas 6–8 menyusul berurutan, lihat MICRO_POLISH_GUIDE.md untuk detail.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 42** — Transisi navigasi ala iOS [DONE]. User: "perbaiki semua
+  transisi yang terlalu over fastest, wajib profesional seperti iOS".
+  Audit animasi di seluruh file: cuma 1 `AnimatedVisibility` yang sudah
+  ada (fade play/pause overlay di preview video, durasi default 300ms —
+  wajar, tidak disentuh). Root cause sebenarnya: navigasi antar-screen
+  (`VideoResizerApp` — Batch/GIF/Compressor/Studio) sama sekali TIDAK
+  pakai animasi, cuma `if (screen == Screen.X)` biasa → screen baru
+  muncul/hilang instan sebijinya, itulah yang kerasa "over fastest".
+  Fix: 4 blok diganti `AnimatedVisibility` dgn pola push/pop khas iOS
+  (slide dari kanan + fade masuk 350ms, slide ke kanan + fade keluar
+  300ms, easing cubic-bezier ease-in-out). Konsisten di 4 tempat lewat
+  konstanta bersama `IosPushEasing`/`IOS_PUSH_MS`/`IOS_POP_MS`. File
+  disentuh: `MainActivity.kt` (1 file, sesuai micro-batch limit).
 - **Batch 41** — Studio sweep-select + fix delete visibility [DONE].
   User report (screenshot Studio list): delete button tidak terlihat
   sama sekali + tidak ada multi-select/sweep-select. Audit: delete

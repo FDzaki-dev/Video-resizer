@@ -1,5 +1,26 @@
 # Changelog
 
+## Batch 42: Transisi Navigasi Ala iOS (Push/Pop Slide + Fade)
+
+### CHANGED
+`MainActivity.kt`, `VideoResizerApp` — navigasi ke 4 full-screen
+overlay (`BatchScreen`, `GifScreen`, `CompressorScreen`, `StudioScreen`)
+sebelumnya `if (screen == Screen.X) { Screen(...) }`: nol animasi,
+screen langsung muncul/hilang instan tiap tap. Diganti
+`AnimatedVisibility` dengan transisi ala `UINavigationController` iOS:
+- **Masuk:** slide dari tepi kanan layar ke posisi 0 + fade in,
+  `tween(350ms, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f))`
+  (kurva ease-in-out, dekat dengan default push curve iOS).
+- **Keluar:** slide ke tepi kanan + fade out, `tween(300ms)` — sedikit
+  lebih cepat dari masuk, meniru pop iOS yang terasa lebih ringan.
+- Konstanta (`IosPushEasing`, `IOS_PUSH_MS`, `IOS_POP_MS`) dideklarasi
+  sekali di atas `VideoResizerApp`, dipakai identik di semua 4 tempat
+  — konsisten, bukan hanya 1 screen yang diperbaiki.
+- Audit: sebelumnya cuma ada 1 titik animasi lain di seluruh app (fade
+  overlay tombol play/pause di preview video, durasi default sudah
+  wajar) — tidak disentuh, di luar scope keluhan.
+- File disentuh: `MainActivity.kt` (1 file).
+
 ## Batch 41: Studio — Sweep-Select + Fix Tombol Hapus Tak Terlihat
 
 ### FIXED

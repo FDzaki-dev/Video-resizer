@@ -11,8 +11,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -209,6 +214,19 @@ private data class GifPrefill(
     val targetWidth: Int
 )
 
+/**
+ * iOS-style push/pop transition constants (Batch 42). Screen switches
+ * used to be an instant `if (condition) { Screen(...) }` cut — zero
+ * animation, which reads as abrupt/unpolished compared to iOS's
+ * UINavigationController push (new screen slides in from the right
+ * over ~350ms on an ease-in-out curve, slightly faster on the way back).
+ * These are shared by every full-screen overlay (Batch/GIF/Compressor/
+ * Studio) so the whole app feels consistent, not just one screen.
+ */
+private val IosPushEasing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+private const val IOS_PUSH_MS = 350
+private const val IOS_POP_MS = 300
+
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 private fun VideoResizerApp(
@@ -249,24 +267,64 @@ private fun VideoResizerApp(
             studioMessage = studioMessage,
             onStudioMessageShown = { studioMessage = null }
         )
-        if (screen == Screen.BATCH) {
+        AnimatedVisibility(
+            visible = screen == Screen.BATCH,
+            enter = slideInHorizontally(
+                animationSpec = tween(IOS_PUSH_MS, easing = IosPushEasing),
+                initialOffsetX = { fullWidth -> fullWidth }
+            ) + fadeIn(tween(IOS_PUSH_MS, easing = IosPushEasing)),
+            exit = slideOutHorizontally(
+                animationSpec = tween(IOS_POP_MS, easing = IosPushEasing),
+                targetOffsetX = { fullWidth -> fullWidth }
+            ) + fadeOut(tween(IOS_POP_MS, easing = IosPushEasing))
+        ) {
             BatchScreen(
                 onBack = { screen = Screen.MAIN }
             )
         }
-        if (screen == Screen.GIF) {
+        AnimatedVisibility(
+            visible = screen == Screen.GIF,
+            enter = slideInHorizontally(
+                animationSpec = tween(IOS_PUSH_MS, easing = IosPushEasing),
+                initialOffsetX = { fullWidth -> fullWidth }
+            ) + fadeIn(tween(IOS_PUSH_MS, easing = IosPushEasing)),
+            exit = slideOutHorizontally(
+                animationSpec = tween(IOS_POP_MS, easing = IosPushEasing),
+                targetOffsetX = { fullWidth -> fullWidth }
+            ) + fadeOut(tween(IOS_POP_MS, easing = IosPushEasing))
+        ) {
             GifScreen(
                 onBack = { screen = Screen.MAIN },
                 prefill = gifPrefill,
                 onPrefillConsumed = { gifPrefill = null }
             )
         }
-        if (screen == Screen.COMPRESSOR) {
+        AnimatedVisibility(
+            visible = screen == Screen.COMPRESSOR,
+            enter = slideInHorizontally(
+                animationSpec = tween(IOS_PUSH_MS, easing = IosPushEasing),
+                initialOffsetX = { fullWidth -> fullWidth }
+            ) + fadeIn(tween(IOS_PUSH_MS, easing = IosPushEasing)),
+            exit = slideOutHorizontally(
+                animationSpec = tween(IOS_POP_MS, easing = IosPushEasing),
+                targetOffsetX = { fullWidth -> fullWidth }
+            ) + fadeOut(tween(IOS_POP_MS, easing = IosPushEasing))
+        ) {
             CompressorScreen(
                 onBack = { screen = Screen.MAIN }
             )
         }
-        if (screen == Screen.STUDIO) {
+        AnimatedVisibility(
+            visible = screen == Screen.STUDIO,
+            enter = slideInHorizontally(
+                animationSpec = tween(IOS_PUSH_MS, easing = IosPushEasing),
+                initialOffsetX = { fullWidth -> fullWidth }
+            ) + fadeIn(tween(IOS_PUSH_MS, easing = IosPushEasing)),
+            exit = slideOutHorizontally(
+                animationSpec = tween(IOS_POP_MS, easing = IosPushEasing),
+                targetOffsetX = { fullWidth -> fullWidth }
+            ) + fadeOut(tween(IOS_POP_MS, easing = IosPushEasing))
+        ) {
             StudioScreen(
                 onBack = { screen = Screen.MAIN },
                 onEditAgain = { entry ->
