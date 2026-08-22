@@ -1,13 +1,22 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 34**. This is the first-read file per the context
+Snapshot as of **Batch 35**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
-architecture/quirk notes live in README.md.
+architecture/quirk notes live in README.md. Untuk task polishing UI/UX,
+baca juga **MICRO_POLISH_GUIDE.md** (standing playbook permanen, ditanam
+Batch 35) sebelum mulai.
 
 ## Standing rules (permanent — read first, applies to every future session without exception)
 
+- **Embedded Micro-Polish Guide rule (added Batch 35).** `MICRO_POLISH_GUIDE.md`
+  di root adalah playbook permanen hasil embed dari upload user
+  (`VideoResizer_FINAL_MICRO_POLISH_ClaudeOnly.md`). Berisi hard rules +
+  8 prioritas polish UI/UX + verification gate + format laporan wajib.
+  WAJIB dibaca sebelum task polishing apa pun. File ini tidak boleh
+  dihapus meski seluruh 8 prioritas sudah [DONE] — cukup ditandai selesai
+  per item, bukan dihapus. Ini rule permanen, bukan item batch-history.
 - **Bahasa Indonesia-only documentation rule (added Batch 30).** Mulai
   sekarang, SEMUA entri dokumentasi baru (PROJECT_STATE.md, CHANGELOG.md,
   FILE_MANIFEST.txt, komentar rilis, dsb.) WAJIB ditulis dalam Bahasa
@@ -53,9 +62,19 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-_Kosong — audit sektor kompresi video (Batch 31) tuntas, semua temuan (3 fungsional + 1 UX) sudah dikerjakan Batch 31-34._
+1. Eksekusi **MICRO_POLISH_GUIDE.md Prioritas 1** (Konsistensi Bahasa UI)
+   — mulai dari sini, satu prioritas per micro-batch (maks 3 file/task).
+2. Prioritas 2 (Presentasi Error) — setelah Prioritas 1 selesai & verified.
+3. Prioritas 3–8 menyusul berurutan, lihat MICRO_POLISH_GUIDE.md untuk detail.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 35** — Tanam `MICRO_POLISH_GUIDE.md` sebagai standing playbook
+  permanen (sumber: upload user `VideoResizer_FINAL_MICRO_POLISH_
+  ClaudeOnly.md`). TIDAK ada perubahan kode/logika sama sekali batch ini
+  — murni dokumentasi. File diubah: PROJECT_STATE.md, CHANGELOG.md,
+  FILE_MANIFEST.txt (referensi/manifest saja); file ditambah:
+  MICRO_POLISH_GUIDE.md. Pending Queue diisi ulang mengarah ke eksekusi
+  Prioritas 1 di batch berikutnya.
 - **Batch 34** — Penutup audit kompresi video: fix item Pending Queue
   terakhir (dialog konfirmasi back-saat-proses). `CompressorScreen`
   sekarang punya `showExitWhileProcessingConfirm` sama persis pola

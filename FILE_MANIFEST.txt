@@ -1,5 +1,5 @@
 FILE_MANIFEST.txt — Video Resizer
-Generated: Batch 6, last updated Batch 19. Regenerate/update this file
+Generated: Batch 6, last updated Batch 35. Regenerate/update this file
 whenever files are added, removed, or renamed — it should always match
 `find . -type f` for real.
 Legend: [PROTECTED] = edit-parsial-only per user preferences; deleting or
@@ -17,6 +17,7 @@ ROOT
   README.md                                context: architecture notes, known quirks, operational status
   CHANGELOG.md                             context: full batch-by-batch history
   PROJECT_STATE.md                         context: current state snapshot (this batch's companion file)
+  MICRO_POLISH_GUIDE.md                    context: standing playbook micro-polish permanen (Batch 35, sumber upload user), belum dieksekusi — lihat PROJECT_STATE.md Pending Queue
   FILE_MANIFEST.txt                        this file
 
 app/

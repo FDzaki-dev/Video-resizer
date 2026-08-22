@@ -1,5 +1,27 @@
 # Changelog
 
+## Batch 35: Tanam MICRO_POLISH_GUIDE.md sebagai standing playbook permanen
+
+Sesuai permintaan user, panduan `VideoResizer_FINAL_MICRO_POLISH_
+ClaudeOnly.md` (upload user) ditanam permanen ke project sebagai
+`MICRO_POLISH_GUIDE.md` di root — bukan dieksekusi, hanya disimpan
+sebagai referensi standing rule yang otomatis dibaca setiap sesi
+berikutnya lewat context hierarchy PROJECT_STATE.md.
+
+**Yang dilakukan:**
+- File baru `MICRO_POLISH_GUIDE.md`: hard rules + 8 prioritas polish
+  UI/UX (bahasa UI, error presentation, action row layar kecil, estimasi
+  ukuran file, lifecycle filmstrip, responsive/font-scale, accessibility,
+  duplikasi theme/system-bar) + verification gate + format laporan.
+- `PROJECT_STATE.md`: standing rule baru + Pending Queue diarahkan ke
+  eksekusi Prioritas 1 di batch berikutnya.
+- `FILE_MANIFEST.txt`: baris manifest untuk file baru.
+
+**TIDAK ada perubahan kode/logika/UI apa pun batch ini** — murni
+dokumentasi/embedding, sesuai instruksi user ("tanamkan panduan tersebut
+ke dalam project secara permanen"). Eksekusi aktual 8 prioritas menyusul
+bertahap mulai batch berikutnya.
+
 ## Batch 34: Dialog konfirmasi back-saat-proses di CompressorScreen (penutup audit kompresi video)
 
 Item terakhir Pending Queue dari audit Batch 31. `CompressorScreen`
