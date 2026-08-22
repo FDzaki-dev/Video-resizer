@@ -1,5 +1,17 @@
 # Changelog
 
+## Batch 30: Standing rule permanen — dokumentasi baru wajib Bahasa Indonesia
+
+Atas permintaan user, ditambahkan standing rule permanen di
+PROJECT_STATE.md: seluruh entri dokumentasi baru (PROJECT_STATE.md,
+CHANGELOG.md, FILE_MANIFEST.txt, dsb.) wajib ditulis Bahasa Indonesia
+mulai batch ini, berlaku untuk semua sesi berikutnya tanpa kecuali.
+Dokumentasi lama yang masih Bahasa Inggris (termasuk entri CHANGELOG di
+bawah ini) sengaja TIDAK diterjemahkan/disentuh sesuai instruksi user.
+Item Pending Queue lama soal penerjemahan penuh README.md/CHANGELOG.md
+ke Bahasa Indonesia di-supersede dan ditutup — tidak ada task
+penerjemahan retroaktif. Batch ini docs-only, tidak ada perubahan kode.
+
 ## Unreleased — Batch 24: Fold Update+Theme into overflow menu (fix title truncation regression)
 
 Follow-up on Batch 23. Batch 23's `maxLines=1` + `TextOverflow.Ellipsis`

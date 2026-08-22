@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 24**. This is the first-read file per the context
+Snapshot as of **Batch 30**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -8,6 +8,14 @@ architecture/quirk notes live in README.md.
 
 ## Standing rules (permanent — read first, applies to every future session without exception)
 
+- **Bahasa Indonesia-only documentation rule (added Batch 30).** Mulai
+  sekarang, SEMUA entri dokumentasi baru (PROJECT_STATE.md, CHANGELOG.md,
+  FILE_MANIFEST.txt, komentar rilis, dsb.) WAJIB ditulis dalam Bahasa
+  Indonesia — tanpa kecuali, berlaku permanen untuk setiap sesi berikutnya.
+  Entri/dokumentasi lama yang masih Bahasa Inggris TIDAK perlu diterjemahkan
+  atau disentuh (biarkan apa adanya) — aturan ini hanya berlaku untuk entri
+  baru ke depan, bukan penerjemahan retroaktif. Ini rule permanen, bukan
+  item batch-history, jangan dianggap "resolved and removable".
 - **Automated versioning rule (added Batch 22).** `versionCode` AND
   `versionName` are BOTH derived automatically from CI (`$GITHUB_RUN_NUMBER`
   via `VERSION_CODE_OVERRIDE`) in `app/build.gradle.kts` — see "Current
@@ -45,14 +53,20 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **Dokumentasi repository wajib Bahasa Indonesia saja**: README.md dan
-   CHANGELOG.md saat ini campur Bahasa Inggris (ditulis dari sesi-sesi
-   sebelumnya). Perlu diterjemahkan penuh ke Bahasa Indonesia. Ini
-   pekerjaan besar (README.md ~36KB, CHANGELOG.md ~52KB) — akan dikerjakan
-   bertahap per section di batch-batch berikutnya, bukan sekaligus, sesuai
-   Strict Micro-Batching Rule (menghindari ZIP terpotong).
+1. **(SUPERSEDED Batch 30, lihat Standing rules di atas)** ~~Dokumentasi
+   repository wajib Bahasa Indonesia saja~~ — user mengonfirmasi entri
+   lama berbahasa Inggris (README.md, CHANGELOG.md, dst.) TIDAK perlu
+   diterjemahkan/disentuh. Rule final: hanya entri dokumentasi BARU mulai
+   Batch 30 yang wajib Bahasa Indonesia. Tidak ada task penerjemahan
+   retroaktif — item ini closed, bukan pending lagi.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 30** — Menambahkan standing rule permanen: seluruh entri
+  dokumentasi baru (PROJECT_STATE.md, CHANGELOG.md, FILE_MANIFEST.txt, dsb.)
+  wajib Bahasa Indonesia mulai sekarang, tanpa kecuali. Dokumentasi lama
+  berbahasa Inggris tidak disentuh/diterjemahkan. Item Pending Queue lama
+  soal penerjemahan penuh README/CHANGELOG di-supersede dan ditutup. No
+  code changes (docs-only batch).
 - **Batch 29** — User explicitly requested 100% haptic coverage ("Semua
   tombol (100%). selama gak menganggu UX!!") after being asked
   action-only vs full. Extended from 13 → 75 haptic call sites, covering
