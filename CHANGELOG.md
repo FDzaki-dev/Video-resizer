@@ -1,5 +1,45 @@
 # Changelog
 
+## Batch 31: Audit kompresi video — fix Transformer.cancel() & foreground service di CompressorScreen
+
+Audit mendalam sektor kompresi video atas permintaan user, menuju "100%
+polished". Membandingkan `CompressorScreen` terhadap pola yang sudah
+terbukti benar di `ResizerScreen` dan `BatchScreen` (keduanya sudah pernah
+melalui bug-fix serupa, lihat komentar "BUG FIX" di baris ~634 dan ~1821).
+
+**Ditemukan (3 item), 1 diperbaiki batch ini:**
+
+1. **[HIGH — DIPERBAIKI] Tombol "Batalkan" & back-saat-proses tidak
+   menghentikan proses kompres sungguhan.** `CompressorScreen` menyimpan
+   `activeJob: Job` dari `scope.launch { VideoResizer(context).compress(...) }`
+   — tapi `compress()` bukan fungsi `suspend`, jadi Job itu selesai
+   seketika setelah memulai pipeline async-nya, jauh sebelum user sempat
+   menekan Batalkan. `activeJob?.cancel()` akibatnya cancel Job yang sudah
+   mati, encoder (`Transformer`) tetap jalan di background sampai
+   selesai sendiri, dan `onDone` callback-nya masih bisa menulis hasil ke
+   galeri/history walau UI sudah menampilkan "Dibatalkan". Fix: ganti ke
+   `activeTransformer: Transformer?` (persis pola ResizerScreen), cancel
+   sungguhan lewat `activeTransformer?.cancel()` di kedua titik (tombol +
+   BackHandler).
+2. **[HIGH — DIPERBAIKI] Tidak pakai `ExportForegroundService`.**
+   ResizerScreen dan BatchScreen membungkus proses panjangnya dengan
+   foreground service (notifikasi progres + mencegah OS membunuh proses
+   saat app di-background). `CompressorScreen` tidak sama sekali —
+   kompres video besar sambil app di-background berisiko proses mati
+   diam-diam tanpa hasil. Fix: tambah `ExportForegroundService.start/
+   updateProgress/stop` mengikuti pola persis ResizerScreen.
+3. **[MEDIUM — masuk Pending Queue, belum dikerjakan]** `ASSUMED_FPS = 30`
+   hardcoded di formula target bitrate `CompressionLevel`, tidak
+   menyesuaikan fps asli source (60fps/24fps) — lihat PROJECT_STATE.md
+   Pending Queue #1 untuk detail & rencana fix.
+4. **[LOW — masuk Pending Queue]** `estimateSourceBitrateBps` asumsi flat
+   128kbps audio track. Lihat Pending Queue #2.
+
+File diubah: `MainActivity.kt` saja (`CompressorScreen`). Tidak ada
+perubahan pada `VideoResizer.kt` batch ini — item #3 dan #4 di atas ada
+di sana tapi sengaja ditunda ke batch berikutnya sesuai Strict
+Micro-Batching Rule (1 task krusial per batch).
+
 ## Batch 30: Standing rule permanen — dokumentasi baru wajib Bahasa Indonesia
 
 Atas permintaan user, ditambahkan standing rule permanen di

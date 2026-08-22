@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 30**. This is the first-read file per the context
+Snapshot as of **Batch 31**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -53,14 +53,44 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **(SUPERSEDED Batch 30, lihat Standing rules di atas)** ~~Dokumentasi
-   repository wajib Bahasa Indonesia saja~~ — user mengonfirmasi entri
-   lama berbahasa Inggris (README.md, CHANGELOG.md, dst.) TIDAK perlu
-   diterjemahkan/disentuh. Rule final: hanya entri dokumentasi BARU mulai
-   Batch 30 yang wajib Bahasa Indonesia. Tidak ada task penerjemahan
-   retroaktif — item ini closed, bukan pending lagi.
+1. **[MEDIUM] `ASSUMED_FPS = 30` hardcoded di `CompressionLevel`
+   (VideoResizer.kt).** Rumus target bitrate (`bits-per-pixel-per-frame ×
+   ASSUMED_FPS`) selalu asumsi 30fps walau source aslinya 60fps (rekaman
+   slow-mo/action umum di HP) atau 24fps. Akibatnya: video 60fps dikompres
+   dengan bitrate yang sebenarnya dihitung untuk setengah frame-rate-nya →
+   kualitas per-frame turun lebih dari yang dijanjikan preset. Video 24fps
+   sebaliknya dapat bitrate lebih besar dari perlu → ukuran hasil lebih
+   besar dari optimal. Fix: probe `METADATA_KEY_CAPTURE_FRAMERATE` (atau
+   fallback ke track format) di `CompressorScreen`, alirkan sebagai field
+   baru di `CompressRequest`, pakai di `computeCompressTargetBitrateBps`
+   menggantikan konstanta `ASSUMED_FPS`.
+2. **[LOW] `estimateSourceBitrateBps` asumsi flat 128kbps audio.**
+   (VideoResizer.kt, dipakai `computeCompressTargetBitrateBps` sbg cap
+   85%.) Source tanpa audio track sama sekali (tapi `muteAudio=false`
+   diminta) akan salah dikurangi 128kbps dari estimasi bitrate video,
+   sedikit memperketat cap tanpa perlu. Edge case, dampak kecil — prioritas
+   rendah, kerjakan setelah item 1.
+3. **[LOW] "Batalkan" di CompressorScreen belum ada dialog konfirmasi
+   back-saat-proses** seperti `showExitWhileProcessingConfirm` di
+   ResizerScreen (baris ~648). Batch 31 sudah memperbaiki bagian yang
+   krusial (Transformer benar-benar berhenti), dialog konfirmasi ini murni
+   UX nice-to-have, bukan bug fungsional.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 31** — Audit mendalam sektor kompresi video (diminta user).
+  Ditemukan & DIPERBAIKI (paling krusial): `CompressorScreen` tombol
+  "Batalkan" + back-saat-proses tidak pernah benar-benar menghentikan
+  `Transformer` (hanya cancel coroutine Job yang sudah selesai duluan) —
+  encoder tetap jalan diam-diam di background, dan `CompressorScreen`
+  sama sekali tidak pakai `ExportForegroundService` (beda dari
+  ResizerScreen/BatchScreen) sehingga proses kompres video besar berisiko
+  dibunuh OS saat app di-background. Fix: ganti `activeJob: Job` →
+  `activeTransformer: Transformer`, cancel yang benar di kedua titik, +
+  pasang `ExportForegroundService.start/updateProgress/stop` mengikuti
+  pola ResizerScreen (baris ~587-640) persis. 2 temuan lain (ASSUMED_FPS
+  hardcoded 30fps; estimasi audio bitrate flat 128kbps) masuk Pending
+  Queue, belum dikerjakan sesuai Strict Micro-Batching Rule. File diubah:
+  MainActivity.kt saja.
 - **Batch 30** — Menambahkan standing rule permanen: seluruh entri
   dokumentasi baru (PROJECT_STATE.md, CHANGELOG.md, FILE_MANIFEST.txt, dsb.)
   wajib Bahasa Indonesia mulai sekarang, tanpa kecuali. Dokumentasi lama

@@ -4193,7 +4193,16 @@ private fun CompressorScreen(onBack: () -> Unit) {
     var resultSizeBytes by remember { mutableLongStateOf(0L) }
     var galleryUri by remember { mutableStateOf<Uri?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
-    var activeJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // BUG FIX (Batch 31): sebelumnya screen ini hanya menyimpan coroutine
+    // Job pembungkus (yang langsung selesai begitu compress() memulai
+    // pipeline async-nya, sebelum sempat menunggu apa pun) — jadi tombol
+    // "Batalkan" & back-saat-proses TIDAK pernah benar-benar menghentikan
+    // Transformer. Encoder tetap jalan diam-diam di background (buang
+    // baterai/CPU) dan callback onDone masih bisa nyelonong menulis hasil
+    // ke galeri/history setelah UI sudah "dibatalkan". Sama seperti
+    // activeTransformer di ResizerScreen (baris ~634) & BatchScreen (baris
+    // ~1821) — cancel yang benar adalah Transformer.cancel(), bukan Job.
+    var activeTransformer by remember { mutableStateOf<androidx.media3.transformer.Transformer?>(null) }
     var showVideoPicker by remember { mutableStateOf(false) }
 
     // Same duration/width/height probe every other screen uses, plus the
@@ -4272,7 +4281,11 @@ private fun CompressorScreen(onBack: () -> Unit) {
 
     // Same BackHandler reasoning as every other manual-state screen here.
     androidx.activity.compose.BackHandler(enabled = true) {
-        if (isProcessing) activeJob?.cancel()
+        if (isProcessing) {
+            activeTransformer?.cancel()
+            activeTransformer = null
+            ExportForegroundService.stop(context)
+        }
         onBack()
     }
 
@@ -4383,7 +4396,9 @@ private fun CompressorScreen(onBack: () -> Unit) {
                             Text("Mengompres… $progress%", color = MaterialTheme.colorScheme.onBackground)
                             OutlinedButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                activeJob?.cancel()
+                                activeTransformer?.cancel()
+                                activeTransformer = null
+                                ExportForegroundService.stop(context)
                                 isProcessing = false
                                 message = "Dibatalkan."
                             }) { Text("Batalkan") }
@@ -4412,13 +4427,24 @@ private fun CompressorScreen(onBack: () -> Unit) {
                                 trimEndMs = endMs,
                                 level = level
                             )
-                            activeJob = scope.launch {
-                                VideoResizer(context).compress(
-                                    request,
-                                    onProgress = { p -> progress = p },
-                                    onDone = { result ->
-                                        isProcessing = false
-                                        when (result) {
+                            // BUG FIX (Batch 31): jalankan lewat foreground
+                            // service yang sama dengan ResizerScreen/BatchScreen
+                            // agar proses kompres video besar tidak dibunuh OS
+                            // saat app di-background, dan progresnya terlihat
+                            // di notifikasi — screen ini sebelumnya tidak
+                            // memakainya sama sekali.
+                            ExportForegroundService.start(context)
+                            activeTransformer = VideoResizer(context).compress(
+                                request,
+                                onProgress = { p ->
+                                    progress = p
+                                    ExportForegroundService.updateProgress(context, p)
+                                },
+                                onDone = { result ->
+                                    isProcessing = false
+                                    activeTransformer = null
+                                    ExportForegroundService.stop(context)
+                                    when (result) {
                                             is ResizeResult.Success -> {
                                                 scope.launch {
                                                     val (msg, pubUri, outSize) = withContext(Dispatchers.IO) {
@@ -4469,7 +4495,6 @@ private fun CompressorScreen(onBack: () -> Unit) {
                                         }
                                     }
                                 )
-                            }
                         },
                         enabled = clipDurationMs > 0,
                         modifier = Modifier.fillMaxWidth().height(52.dp)
