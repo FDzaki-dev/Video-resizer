@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Gif
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
@@ -392,7 +393,7 @@ private fun ResizerScreen(
             null
         }
     }
-    var showThemeMenu by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
     var showCustomResDialog by remember { mutableStateOf(false) }
     var customWidth by remember { mutableStateOf<Int?>(null) }
     var customHeight by remember { mutableStateOf<Int?>(null) }
@@ -838,23 +839,17 @@ private fun ResizerScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            if (!checkingUpdate) {
-                                checkingUpdate = true
-                                scope.launch {
-                                    updateResult = AppUpdater.check(context)
-                                    checkingUpdate = false
-                                }
-                            }
-                        }
-                    ) {
-                        if (checkingUpdate) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Filled.SystemUpdate, contentDescription = "Cek update")
-                        }
-                    }
+                    // BUG FIX (Batch 24): Batch 21's standalone update
+                    // button pushed the bar from 5 action icons to 6,
+                    // which is what forced Batch 23's maxLines=1+Ellipsis
+                    // fix to truncate the title down to "Vi…" — not
+                    // distorted anymore, but not acceptable either per
+                    // user feedback. Real fix: fold Update + Theme (both
+                    // "settings-like", not core editing actions) into one
+                    // "More" overflow menu, restoring the original 5-icon
+                    // width (4 core features + 1 more) the title had
+                    // before Batch 21 — so "Video Resizer" fits without
+                    // truncation on typical screen widths again.
                     IconButton(onClick = onOpenCompressor) {
                         Icon(Icons.Filled.Compress, contentDescription = "Kompres video")
                     }
@@ -868,27 +863,59 @@ private fun ResizerScreen(
                         Icon(Icons.Filled.PhotoLibrary, contentDescription = "Studio")
                     }
                     Box {
-                        IconButton(onClick = { showThemeMenu = true }) {
-                            Icon(
-                                imageVector = when (themePref) {
-                                    ThemePreference.LIGHT -> Icons.Filled.LightMode
-                                    ThemePreference.DARK -> Icons.Filled.DarkMode
-                                    ThemePreference.SYSTEM -> Icons.Filled.DarkMode
-                                    // Custom themes get their own icon rather than being forced
-                                    // into a light/dark bucket that doesn't really describe them.
-                                    ThemePreference.MIDNIGHT_NEON, ThemePreference.WARM_PAPER, ThemePreference.MIDNIGHT_BLUE_GLASS -> Icons.Filled.Palette
-                                },
-                                contentDescription = "Theme"
-                            )
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            if (checkingUpdate) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Filled.MoreVert, contentDescription = "Menu lainnya")
+                            }
                         }
-                        DropdownMenu(expanded = showThemeMenu, onDismissRequest = { showThemeMenu = false }) {
-                            DropdownMenuItem(text = { Text("Dark") }, onClick = { onThemePrefChange(ThemePreference.DARK); showThemeMenu = false })
-                            DropdownMenuItem(text = { Text("Light") }, onClick = { onThemePrefChange(ThemePreference.LIGHT); showThemeMenu = false })
-                            DropdownMenuItem(text = { Text("Follow system") }, onClick = { onThemePrefChange(ThemePreference.SYSTEM); showThemeMenu = false })
+                        DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (checkingUpdate) "Mengecek update…" else "Cek update") },
+                                leadingIcon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
+                                enabled = !checkingUpdate,
+                                onClick = {
+                                    showMoreMenu = false
+                                    checkingUpdate = true
+                                    scope.launch {
+                                        updateResult = AppUpdater.check(context)
+                                        checkingUpdate = false
+                                    }
+                                }
+                            )
                             androidx.compose.material3.HorizontalDivider()
-                            DropdownMenuItem(text = { Text("Midnight Neon") }, onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_NEON); showThemeMenu = false })
-                            DropdownMenuItem(text = { Text("Warm Paper") }, onClick = { onThemePrefChange(ThemePreference.WARM_PAPER); showThemeMenu = false })
-                            DropdownMenuItem(text = { Text("Midnight Blue Glass") }, onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_BLUE_GLASS); showThemeMenu = false })
+                            DropdownMenuItem(
+                                text = { Text("Tema: Dark") },
+                                leadingIcon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
+                                onClick = { onThemePrefChange(ThemePreference.DARK); showMoreMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Tema: Light") },
+                                leadingIcon = { Icon(Icons.Filled.LightMode, contentDescription = null) },
+                                onClick = { onThemePrefChange(ThemePreference.LIGHT); showMoreMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Tema: Ikuti sistem") },
+                                leadingIcon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
+                                onClick = { onThemePrefChange(ThemePreference.SYSTEM); showMoreMenu = false }
+                            )
+                            androidx.compose.material3.HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Tema: Midnight Neon") },
+                                leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
+                                onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_NEON); showMoreMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Tema: Warm Paper") },
+                                leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
+                                onClick = { onThemePrefChange(ThemePreference.WARM_PAPER); showMoreMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Tema: Midnight Blue Glass") },
+                                leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
+                                onClick = { onThemePrefChange(ThemePreference.MIDNIGHT_BLUE_GLASS); showMoreMenu = false }
+                            )
                         }
                     }
                 },

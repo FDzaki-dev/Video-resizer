@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Batch 24: Fold Update+Theme into overflow menu (fix title truncation regression)
+
+Follow-up on Batch 23. Batch 23's `maxLines=1` + `TextOverflow.Ellipsis`
+fix stopped the garbled two-line clipping, but with 6 action icons in the
+bar (since Batch 21's standalone update button), the title slot was still
+so narrow that "Video Resizer" truncated down to "Vi…" — not distorted,
+but not acceptable per user feedback either.
+
+Real fix: consolidated the Update-check button and the Theme picker (both
+settings-like, not core video-editing actions) into a single "More"
+(`MoreVert`) overflow `DropdownMenu`. This restores the exact 5-icon-wide
+action bar (Compress/Batch/GIF/Studio/More) the title had before Batch
+21, so it fits without truncation on typical screen widths again.
+
+- `showThemeMenu` state renamed to `showMoreMenu` (now backs both).
+- Update-check is now the first `DropdownMenuItem` in that menu, labeled
+  "Cek update" / "Mengecek update…" while in flight, and disables itself
+  during the check — a small incidental step toward Pending Queue item 1
+  ("kurang feedback pada tombol update"), NOT the full audit that item
+  still needs across the rest of the app.
+- Theme options are the same 6 entries as before, now with leading icons
+  and Indonesian labels ("Tema: Dark", "Tema: Light", "Tema: Ikuti
+  sistem", "Tema: Midnight Neon", "Tema: Warm Paper", "Tema: Midnight
+  Blue Glass").
+
+1 file touched: `MainActivity.kt`.
+
 ## Unreleased — Batch 23: Fix TopAppBar title text distortion (wrap-then-clip)
 
 Real UI bug, reported via screenshot: `ResizerScreen`'s `TopAppBar` title

@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 23**. This is the first-read file per the context
+Snapshot as of **Batch 24**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -45,13 +45,11 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **Feedback kurang pada tombol update aplikasi** (dan pola serupa di
-   seluruh sektor project): tombol `SystemUpdate` (Batch 21) hanya
-   menampilkan spinner kecil di ikon saat mengecek, dan progress bar
-   hanya muncul di dalam dialog saat mengunduh — tidak ada feedback
-   instan lain (mis. haptic/snackbar/disabled-state yang lebih jelas)
-   saat tombol ditekan. Perlu audit pola yang sama di tombol-tombol lain
-   (Compress/Batch/GIF/Studio/export) untuk konsistensi.
+1. **Feedback pada tombol update aplikasi** (dan pola serupa di seluruh
+   sektor project): Batch 24 sudah menambah sedikit feedback tekstual saat
+   mengecek update ("Mengecek update…" + item ter-disable di menu), tapi
+   audit menyeluruh pola feedback (haptic/snackbar/loading-state) di
+   tombol-tombol lain (Compress/Batch/GIF/Studio/export) BELUM dikerjakan.
 2. **Dokumentasi repository wajib Bahasa Indonesia saja**: README.md dan
    CHANGELOG.md saat ini campur Bahasa Inggris (ditulis dari sesi-sesi
    sebelumnya). Perlu diterjemahkan penuh ke Bahasa Indonesia. Ini
@@ -60,6 +58,20 @@ architecture/quirk notes live in README.md.
    Strict Micro-Batching Rule (menghindari ZIP terpotong).
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 24** — Follow-up fix on Batch 23's title-truncation fix (user:
+  "distorsi sih nggak, tapi gak gini juga kalik" — no longer garbled, but
+  "Vi…" was still unacceptable). Root cause was the bar carrying 6 action
+  icons since Batch 21 (Update/Compress/Batch/GIF/Studio/Theme), squeezing
+  the title slot too narrow even with maxLines=1+Ellipsis. Real fix:
+  folded Update + Theme (both settings-like, not core editing actions)
+  into one "More" (`MoreVert`) overflow `DropdownMenu` — restores the
+  original 5-icon-wide bar (Compress/Batch/GIF/Studio/More) the title had
+  before Batch 21, so "Video Resizer" fits without truncation on typical
+  screen widths again. `showThemeMenu` state renamed `showMoreMenu` (now
+  covers both). Update-check menu item shows "Mengecek update…" + disables
+  itself while in flight — small incidental improvement toward Pending
+  Queue item 1, not a full fix (see below). 1 file touched
+  (`MainActivity.kt`).
 - **Batch 23** — Fixed real UI bug reported via screenshot: `ResizerScreen`'s
   `TopAppBar` title ("Video Resizer") had no `maxLines`/`overflow`, and with
   6 action icons now crammed into the bar since Batch 21's update button,
