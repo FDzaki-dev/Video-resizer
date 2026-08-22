@@ -1,5 +1,40 @@
 # Changelog
 
+## Batch 41: Studio — Sweep-Select + Fix Tombol Hapus Tak Terlihat
+
+### FIXED
+`MainActivity.kt`, `StudioEntryCard` — tombol hapus (ikon `Delete`)
+sebelumnya ada di dalam `Row(Modifier.horizontalScroll(...))` bersama
+3 `TextButton` ("Edit ulang", "Galeri", "Bagikan"). Di layar sempit,
+keempatnya tidak muat sekaligus sehingga ikon hapus tergeser keluar
+viewport — user harus scroll horizontal manual di dalam kartu untuk
+menemukannya (screenshot user tidak menampakkan tombol hapus sama
+sekali). Fix: `IconButton` hapus dipindah keluar dari row yang
+di-scroll, sekarang selalu terlihat fixed di sisi kanan kartu.
+
+### ADDED
+`MainActivity.kt`, `StudioScreen` & `StudioEntryCard` — fitur
+sweep-select (multi-select untuk hapus massal), sebelumnya tidak ada
+sama sekali:
+- Long-press kartu mana pun → masuk selection mode. Tap kartu lain
+  untuk toggle pilih/batal.
+- Indikator: checkbox (`CheckCircle`/`RadioButtonUnchecked`) muncul di
+  kiri thumbnail saat selection mode aktif; kartu terpilih dapat
+  highlight (`primaryContainer` + border tebal).
+- `TopAppBar` berubah saat selection mode: judul jadi "X dipilih",
+  navigation icon jadi `Close` (keluar mode), actions jadi "Pilih
+  Semua" (`CheckCircle`) + "Hapus yang dipilih" (`DeleteSweep`).
+- Bulk delete lewat `AlertDialog` konfirmasi terpisah
+  (`pendingBulkDelete`), pola sama persis dengan single-delete
+  confirm dialog yang sudah ada (mencegah mis-tap hapus permanen).
+- System back / tombol close saat selection mode aktif → keluar dari
+  selection mode dulu, bukan langsung navigasi keluar Studio.
+- Audit "pola serupa di seluruh sektor" (per instruksi user): dicek
+  seluruh file, hanya ada **1** `LazyColumn`/list screen di app
+  (`StudioScreen`) — jadi fitur ini sudah menjangkau semua tempat yang
+  relevan, tidak ada sektor lain yang butuh fitur sama.
+- File disentuh: `MainActivity.kt` (1 file).
+
 ## Batch 40: Crash Fix — SecurityException saat "Buka di Galeri"
 
 ### FIXED

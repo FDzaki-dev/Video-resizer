@@ -18,6 +18,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -26,11 +28,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.BrandingWatermark
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Compress
@@ -3298,6 +3304,17 @@ private fun StudioScreen(
         entries = withContext(Dispatchers.IO) { VideoHistoryStore.getAll(context) }
     }
 
+    // Sweep-select (Batch 41): long-press any card to enter multi-select
+    // mode, tap more cards to add/remove, then bulk-delete via the top
+    // bar. selectedIds keyed by VideoHistoryEntry.id (String).
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    fun exitSelection() { selectionMode = false; selectedIds = emptySet() }
+    fun toggleSelected(id: String) {
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+        if (selectedIds.isEmpty()) selectionMode = false
+    }
+
     // UX FIX: Accidental Delete. Tapping the trash icon used to delete the
     // video + thumbnail file immediately and permanently — a single
     // mis-tap in a scrolling list had no way back. Now it just marks a
@@ -3324,12 +3341,41 @@ private fun StudioScreen(
         )
     }
 
+    // Bulk delete (sweep-select, Batch 41) — same pending+confirm pattern
+    // as single delete above, so a mis-tap on the bulk delete icon can't
+    // wipe the selection permanently either.
+    var pendingBulkDelete by remember { mutableStateOf(false) }
+    if (pendingBulkDelete) {
+        AlertDialog(
+            onDismissRequest = { pendingBulkDelete = false },
+            title = { Text("Hapus ${selectedIds.size} video ini?") },
+            text = { Text("Video dan file hasil resize yang dipilih akan dihapus permanen dan tidak bisa dikembalikan.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val toDelete = entries.filter { it.id in selectedIds }
+                    pendingBulkDelete = false
+                    exitSelection()
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            toDelete.forEach { VideoHistoryStore.deleteWithFiles(context, it) }
+                        }
+                        entries = withContext(Dispatchers.IO) { VideoHistoryStore.getAll(context) }
+                    }
+                }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pendingBulkDelete = false }) { Text("Batal") }
+            }
+        )
+    }
+
     // FIX: Broken System Back Navigation.
     // Screen.STUDIO has no real back-stack entry, so a system back gesture
     // falls through to the Activity and finishes it. This intercepts that
     // gesture and routes it back to Screen.MAIN instead.
     androidx.activity.compose.BackHandler(enabled = true) {
-        onBack()
+        if (selectionMode) exitSelection() else onBack()
     }
 
     val isGlass = com.example.videoresizer.ui.theme.LocalIsGlassTheme.current
@@ -3342,10 +3388,37 @@ private fun StudioScreen(
         modifier = Modifier.fillMaxSize().background(screenBackground),
         topBar = {
             TopAppBar(
-                title = { Text("Studio", fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Text(
+                        if (selectionMode) "${selectedIds.size} dipilih" else "Studio",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onBack() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        if (selectionMode) exitSelection() else onBack()
+                    }) {
+                        Icon(
+                            if (selectionMode) Icons.Filled.Close else Icons.Filled.ArrowBack,
+                            contentDescription = if (selectionMode) "Batal pilih" else "Kembali"
+                        )
+                    }
+                },
+                actions = {
+                    if (selectionMode) {
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedIds = if (selectedIds.size == entries.size) emptySet() else entries.map { it.id }.toSet()
+                        }) {
+                            Icon(Icons.Filled.CheckCircle, contentDescription = "Pilih semua")
+                        }
+                        IconButton(
+                            enabled = selectedIds.isNotEmpty(),
+                            onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pendingBulkDelete = true }
+                        ) {
+                            Icon(Icons.Filled.DeleteSweep, contentDescription = "Hapus yang dipilih", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -3375,6 +3448,14 @@ private fun StudioScreen(
                 items(entries, key = { it.id }) { entry ->
                     StudioEntryCard(
                         entry = entry,
+                        selectionMode = selectionMode,
+                        isSelected = entry.id in selectedIds,
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectionMode = true
+                            toggleSelected(entry.id)
+                        },
+                        onToggleSelect = { toggleSelected(entry.id) },
                         onEditAgain = {
                             // PERF: setDataSource()/extractMetadata() are
                             // blocking I/O — hopping to Dispatchers.IO keeps
@@ -3426,9 +3507,14 @@ private fun StudioScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StudioEntryCard(
     entry: VideoHistoryEntry,
+    selectionMode: Boolean,
+    isSelected: Boolean,
+    onLongPress: () -> Unit,
+    onToggleSelect: () -> Unit,
     onEditAgain: () -> Unit,
     onShare: () -> Unit,
     onOpenInGallery: (() -> Unit)?,
@@ -3443,12 +3529,31 @@ private fun StudioEntryCard(
     }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            if (isSelected) 2.dp else 1.dp,
+            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+        ),
         shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { if (selectionMode) onToggleSelect() },
+                onLongClick = onLongPress
+            )
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (selectionMode) {
+                Icon(
+                    if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = if (isSelected) "Terpilih" else "Belum dipilih",
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+            }
             Box(
                 modifier = Modifier
                     .size(72.dp)
@@ -3556,17 +3661,26 @@ private fun StudioEntryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.horizontalScroll(rememberScrollState())
-                ) {
-                    TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onEditAgain() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Edit ulang") }
-                    if (onOpenInGallery != null) {
-                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onOpenInGallery() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Galeri") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState())
+                    ) {
+                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onEditAgain() }, contentPadding = PaddingValues(horizontal = 8.dp), enabled = !selectionMode) { Text("Edit ulang") }
+                        if (onOpenInGallery != null) {
+                            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onOpenInGallery() }, contentPadding = PaddingValues(horizontal = 8.dp), enabled = !selectionMode) { Text("Galeri") }
+                        }
+                        TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onShare() }, contentPadding = PaddingValues(horizontal = 8.dp), enabled = !selectionMode) { Text("Bagikan") }
                     }
-                    TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onShare() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Bagikan") }
-                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDelete() }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Hapus", tint = MaterialTheme.colorScheme.error)
+                    // FIX (Batch 41): delete used to live inside the
+                    // horizontalScroll row above, so on narrow screens
+                    // (3 text buttons already fill the width) it was
+                    // scrolled off and effectively invisible/undiscoverable.
+                    // Pinned outside the scroll now so it's always visible.
+                    if (!selectionMode) {
+                        IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDelete() }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Hapus", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }

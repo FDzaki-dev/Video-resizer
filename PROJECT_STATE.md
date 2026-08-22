@@ -44,6 +44,18 @@ Batch 35) sebelum mulai.
   permanent policy.
 
 ## Current version
+- **Batch 41 (feature):** Studio — sweep-select + fix delete visibility.
+  1) `StudioEntryCard` delete `IconButton` dulu di dalam Row
+  `horizontalScroll` bareng 3 text button ("Edit ulang/Galeri/Bagikan") →
+  di layar sempit ke-4 nya nggak cukup, delete kegeser keluar viewport
+  (invisible tanpa scroll manual, sesuai screenshot user). Dipindah ke
+  luar scroll, sekarang selalu terlihat. 2) Fitur baru: long-press card
+  → selection mode (checkbox per card, TopAppBar berubah jadi "X
+  dipilih" + Pilih Semua + Hapus massal, back/close keluar dari mode
+  ini dulu sebelum navigasi keluar Studio). Bulk delete pakai
+  confirm-dialog yang sama polanya dgn single delete (Batch-lama fix
+  accidental-delete). Diaudit: cuma ada 1 `LazyColumn`/list screen di
+  seluruh app (StudioScreen) — jadi sudah menjangkau semua "sektor".
 - **Batch 40 (crash fix):** `openInGallery` & `openGifInGallery` — hapus
   `Intent.FLAG_GRANT_READ_URI_PERMISSION` (app tidak berhak grant permission
   atas `content://media/...` URI milik MediaProvider → `SecurityException`
@@ -72,6 +84,20 @@ Batch 35) sebelum mulai.
 2. Prioritas 6–8 menyusul berurutan, lihat MICRO_POLISH_GUIDE.md untuk detail.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 41** — Studio sweep-select + fix delete visibility [DONE].
+  User report (screenshot Studio list): delete button tidak terlihat
+  sama sekali + tidak ada multi-select/sweep-select. Audit: delete
+  `IconButton` sebenarnya SUDAH ada di kode sejak batch lama, tapi
+  ditaruh di ujung `Row(horizontalScroll)` bareng 3 text button → di
+  layar sempit kegeser keluar viewport, jadi user harus scroll manual
+  utk nemuinnya (root cause "gak keliatan"). Fix: pindah delete
+  IconButton keluar dari scroll row, selalu terlihat. Fitur baru:
+  long-press card masuk selection mode, checkbox per-card, TopAppBar
+  berubah ("X dipilih" + Pilih Semua + Hapus massal via icon
+  DeleteSweep), bulk delete lewat confirm dialog (pola sama dgn single
+  delete). Audit "pola serupa di seluruh sektor": app cuma punya 1
+  LazyColumn/list screen (StudioScreen) — sudah tercover semua. File
+  disentuh: `MainActivity.kt` saja (1 file, sesuai micro-batch limit).
 - **Batch 40** — Crash fix [DONE]. User upload crash log:
   `SecurityException: UID ... does not have permission to
   content://media/external/video/media/...` saat tap "Buka di Galeri".
