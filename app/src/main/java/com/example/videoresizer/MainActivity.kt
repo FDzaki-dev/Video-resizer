@@ -58,6 +58,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -804,6 +805,18 @@ private fun ResizerScreen(
         topBar = {
             TopAppBar(
                 title = {
+                    // BUG FIX (Batch 23): with 6 action icons now in this
+                    // bar (update/compress/batch/gif/studio/theme, since
+                    // Batch 21's update button), the title slot's available
+                    // width shrank enough that this Text — which had no
+                    // maxLines/overflow — wrapped "Video Resizer" onto a
+                    // second line and got clipped by TopAppBar's fixed
+                    // height, rendering as garbled fragments ("eo"/"Res").
+                    // weight(1f, fill=false) lets the title shrink to
+                    // whatever width remains instead of forcing the Row
+                    // wider than it has room for; maxLines=1 + Ellipsis
+                    // guarantees a single clean line (truncated with "…" on
+                    // very narrow screens) instead of a wrap-then-clip.
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -815,7 +828,13 @@ private fun ResizerScreen(
                             Icon(Icons.Filled.Movie, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Video Resizer", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Video Resizer",
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
                     }
                 },
                 actions = {

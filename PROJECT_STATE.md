@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 22**. This is the first-read file per the context
+Snapshot as of **Batch 23**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -44,7 +44,33 @@ architecture/quirk notes live in README.md.
 - **Media3: 1.4.1** (bumped from 1.3.1 this batch, see Batch 9 below).
   Deliberately not bumped further — see "Defaults a new reader should know".
 
+## Pending Queue (not done this batch — do next, in this order)
+1. **Feedback kurang pada tombol update aplikasi** (dan pola serupa di
+   seluruh sektor project): tombol `SystemUpdate` (Batch 21) hanya
+   menampilkan spinner kecil di ikon saat mengecek, dan progress bar
+   hanya muncul di dalam dialog saat mengunduh — tidak ada feedback
+   instan lain (mis. haptic/snackbar/disabled-state yang lebih jelas)
+   saat tombol ditekan. Perlu audit pola yang sama di tombol-tombol lain
+   (Compress/Batch/GIF/Studio/export) untuk konsistensi.
+2. **Dokumentasi repository wajib Bahasa Indonesia saja**: README.md dan
+   CHANGELOG.md saat ini campur Bahasa Inggris (ditulis dari sesi-sesi
+   sebelumnya). Perlu diterjemahkan penuh ke Bahasa Indonesia. Ini
+   pekerjaan besar (README.md ~36KB, CHANGELOG.md ~52KB) — akan dikerjakan
+   bertahap per section di batch-batch berikutnya, bukan sekaligus, sesuai
+   Strict Micro-Batching Rule (menghindari ZIP terpotong).
+
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 23** — Fixed real UI bug reported via screenshot: `ResizerScreen`'s
+  `TopAppBar` title ("Video Resizer") had no `maxLines`/`overflow`, and with
+  6 action icons now crammed into the bar since Batch 21's update button,
+  the shrunk title slot caused the text to wrap onto a second line and get
+  clipped by the bar's fixed height — rendered as garbled fragments
+  ("eo"/"Res" per the screenshot). Fixed: `Modifier.weight(1f, fill=false)`
+  + `maxLines = 1` + `TextOverflow.Ellipsis` on the title `Text`, so it now
+  always renders as one clean line (ellipsized on very narrow screens
+  instead of wrapping-then-clipping). 1 file touched (`MainActivity.kt`) —
+  the single most critical item from this batch's 3-item request; items 2
+  and 3 recorded above in Pending Queue per Strict Micro-Batching Rule.
 - **Batch 22** — Automated versioning (standing rule, see above): removed
   the hand-maintained `semanticVersionName` literal from
   `app/build.gradle.kts` entirely. `versionName` is now

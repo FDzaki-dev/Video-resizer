@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Batch 23: Fix TopAppBar title text distortion (wrap-then-clip)
+
+Real UI bug, reported via screenshot: `ResizerScreen`'s `TopAppBar` title
+Text ("Video Resizer") had no `maxLines`/`overflow` set. Since Batch 21
+added a 6th action icon (update button) to the same bar, the title slot's
+available width shrank enough that the text wrapped onto a second line —
+which then got clipped by the bar's fixed height, rendering as garbled
+fragments ("eo" / "Res" in the reported screenshot) instead of the full
+"Video Resizer" label.
+
+Fix: `Modifier.weight(1f, fill = false)` on the title `Text` (lets it
+shrink to whatever width remains instead of forcing the Row wider than
+available space), plus `maxLines = 1` and `overflow = TextOverflow.Ellipsis`
+(guarantees a single clean line — ellipsized only if truly out of room,
+never wrapped-then-clipped). 1 file touched: `MainActivity.kt`.
+
+Requested alongside 2 other items this batch — per Strict Micro-Batching
+Rule, only this one (the most critical / visually broken) was done. Other
+2 items recorded in `PROJECT_STATE.md`'s Pending Queue:
+1. Feedback kurang pada tombol update aplikasi (+ audit pola serupa di
+   seluruh sektor project).
+2. Dokumentasi repository wajib Bahasa Indonesia saja (README.md +
+   CHANGELOG.md perlu diterjemahkan penuh, dikerjakan bertahap).
+
 ## Unreleased — Batch 22: Automated versioning (standing rule — no more manual version bumps, ever)
 
 Per explicit user instruction, permanently enshrined as a standing rule in
