@@ -656,6 +656,7 @@ private fun ResizerScreen(
             text = { Text("Video sedang diproses. Keluar sekarang akan menghentikan dan membatalkan proses ini.") },
             confirmButton = {
                 TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     showExitWhileProcessingConfirm = false
                     cancelResize()
                 }) { Text("Batalkan proses", color = MaterialTheme.colorScheme.error) }
@@ -743,6 +744,7 @@ private fun ResizerScreen(
             text = { Text("Memilih video lain akan mereset area potong (trim) dan pengaturan resolusi custom yang sudah kamu atur untuk video ini.") },
             confirmButton = {
                 TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     showChangeVideoConfirm = false
                     showVideoPicker = true
                 }) { Text("Ganti video") }
@@ -883,6 +885,7 @@ private fun ResizerScreen(
                                 leadingIcon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
                                 enabled = !checkingUpdate,
                                 onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     showMoreMenu = false
                                     checkingUpdate = true
                                     scope.launch {
@@ -1366,7 +1369,7 @@ private fun ResizerScreen(
                                 color = MaterialTheme.colorScheme.onBackground,
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            OutlinedButton(onClick = { cancelResize() }) { Text("Batalkan") }
+                            OutlinedButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); cancelResize() }) { Text("Batalkan") }
                         }
                         val eta = exportEtaSeconds
                         Text(
@@ -1616,6 +1619,7 @@ private fun ResizerScreen(
                     TextButton(
                         enabled = progress == null,
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             downloadProgress = -1f
                             scope.launch {
                                 try {
@@ -2359,7 +2363,7 @@ private fun BatchScreen(onBack: () -> Unit) {
                         "Memproses video ${(currentIndex + 1).coerceAtLeast(1)} dari ${items.size}…",
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    OutlinedButton(onClick = { cancelBatch() }, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); cancelBatch() }, modifier = Modifier.fillMaxWidth()) {
                         Text("Batalkan batch")
                     }
                 }
@@ -4007,6 +4011,7 @@ private fun GifScreen(
                         ) {
                             Text("Membuat GIF… $progress%", color = MaterialTheme.colorScheme.onBackground)
                             OutlinedButton(onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 activeJob?.cancel()
                                 isProcessing = false
                                 message = "Dibatalkan."
@@ -4366,6 +4371,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                         ) {
                             Text("Mengompres… $progress%", color = MaterialTheme.colorScheme.onBackground)
                             OutlinedButton(onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 activeJob?.cancel()
                                 isProcessing = false
                                 message = "Dibatalkan."

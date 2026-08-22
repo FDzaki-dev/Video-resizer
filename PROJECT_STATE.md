@@ -53,6 +53,28 @@ architecture/quirk notes live in README.md.
    Strict Micro-Batching Rule (menghindari ZIP terpotong).
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 28** — Fixed audit gap user caught ("termasuk tombol update juga
+  gak??" — answer was no). Added haptic to the 2 remaining update-flow
+  action buttons missed in Batch 27's classification: "Cek update"
+  (`DropdownMenuItem` in More menu) and "Unduh & Pasang" (download+install
+  confirm in the update-result dialog) — both are action-initiating CTAs
+  same tier as Resize/Batch/GIF/Compress start, so they belong in the
+  haptic set, not the "info/query, skip" bucket. Total haptic sites now
+  13. Audit re-closed. 1 file touched (`MainActivity.kt`).
+- **Batch 27** — Completed the feedback audit Batch 26 started (user asked
+  "sudah diaudit belum" — answer was no, only 5/16 action points done).
+  Full pass over all 61 `onClick` handlers in `MainActivity.kt`, classified
+  into: (a) destructive/interrupt actions — now have haptic (11 sites
+  total: 5 from Batch 26 + 6 new this batch — exit-while-processing
+  confirm, change-video confirm, and the 4 "Batalkan"/cancel-job buttons
+  across Resizer/Batch/GIF/Compressor); (b) non-destructive selection
+  chips (fps/width/quality-level/watermark-position/caption-position/
+  theme) and share/gallery/postpone buttons — deliberately left without
+  haptic since they already have immediate visual highlight or hand off
+  to a system intent, which is itself sufficient feedback; adding haptic
+  there would be noise, not a gap. Toast/snackbar and loading-state
+  coverage were already complete per Batch 26. Audit is now closed — no
+  remaining gap in this category. 1 file touched (`MainActivity.kt`).
 - **Batch 26** — Closed Pending Queue item 1 (feedback audit). Added
   `LocalHapticFeedback` (`HapticFeedbackType.LongPress`) to the 5 highest-
   value action points that had zero tactile feedback before: Resize CTA
