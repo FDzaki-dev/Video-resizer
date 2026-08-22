@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -1559,7 +1560,7 @@ private fun ResizerScreen(
                                     }
                                     outputFile?.let { file ->
                                         TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareVideo(context, file) }) {
-                                            Text("Share")
+                                            Text("Bagikan")
                                         }
                                     }
                                 }
@@ -2017,7 +2018,7 @@ private fun BatchScreen(onBack: () -> Unit) {
         modifier = Modifier.fillMaxSize().background(screenBackground),
         topBar = {
             TopAppBar(
-                title = { Text("Batch Export", fontWeight = FontWeight.SemiBold) },
+                title = { Text("Ekspor Batch", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2956,7 +2957,7 @@ private fun CustomResolutionDialog(
             dismissOnBackPress = false,
             dismissOnClickOutside = false
         ),
-        title = { Text("Custom Resolution") },
+        title = { Text("Resolusi Kustom") },
         text = {
             // FIX: Keyboard Blocks Dialog. imePadding() pushes this content
             // (and the Save/Cancel buttons) up above the keyboard so they
@@ -2971,7 +2972,7 @@ private fun CustomResolutionDialog(
                     OutlinedTextField(
                         value = widthText,
                         onValueChange = { input -> widthText = input.filter { c -> c.isDigit() }.take(4) },
-                        label = { Text("Width") },
+                        label = { Text("Lebar") },
                         singleLine = true,
                         isError = widthError != null,
                         supportingText = { widthError?.let { Text(it) } },
@@ -2983,7 +2984,7 @@ private fun CustomResolutionDialog(
                     OutlinedTextField(
                         value = heightText,
                         onValueChange = { input -> heightText = input.filter { c -> c.isDigit() }.take(4) },
-                        label = { Text("Height") },
+                        label = { Text("Tinggi") },
                         singleLine = true,
                         isError = heightError != null,
                         supportingText = { heightError?.let { Text(it) } },
@@ -3009,10 +3010,10 @@ private fun CustomResolutionDialog(
                     if (isValid && w != null && h != null) onSave(w, h)
                 },
                 enabled = isValid
-            ) { Text("Save") }
+            ) { Text("Simpan") }
         },
         dismissButton = {
-            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Batal") }
         }
     )
 }
@@ -3044,7 +3045,7 @@ private fun CustomBitrateDialog(
             dismissOnBackPress = false,
             dismissOnClickOutside = false
         ),
-        title = { Text("Custom Bitrate") },
+        title = { Text("Bitrate Kustom") },
         text = {
             Column(
                 modifier = Modifier
@@ -3075,10 +3076,10 @@ private fun CustomBitrateDialog(
             TextButton(
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); kbpsValue?.let { if (isValid) onSave(it) } },
                 enabled = isValid
-            ) { Text("Save") }
+            ) { Text("Simpan") }
         },
         dismissButton = {
-            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Batal") }
         }
     )
 }
@@ -3170,10 +3171,10 @@ private fun TargetSizeDialog(
             TextButton(
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); computedKbps?.let(onSave) },
                 enabled = computedKbps != null
-            ) { Text("Save") }
+            ) { Text("Simpan") }
         },
         dismissButton = {
-            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Batal") }
         }
     )
 }
@@ -3235,10 +3236,10 @@ private fun BatchTargetSizeDialog(
             TextButton(
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); sizeValue?.let(onSave) },
                 enabled = isValid
-            ) { Text("Save") }
+            ) { Text("Simpan") }
         },
         dismissButton = {
-            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Cancel") }
+            TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDismiss() }) { Text("Batal") }
         }
     )
 }
@@ -3555,12 +3556,15 @@ private fun StudioEntryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
                     TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onEditAgain() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Edit ulang") }
                     if (onOpenInGallery != null) {
                         TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onOpenInGallery() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Galeri") }
                     }
-                    TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onShare() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Share") }
+                    TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onShare() }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Bagikan") }
                     IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onDelete() }) {
                         Icon(Icons.Filled.Delete, contentDescription = "Hapus", tint = MaterialTheme.colorScheme.error)
                     }
@@ -3853,7 +3857,7 @@ private fun GifScreen(
                 sourceHeight = loaded.third
                 trimRange = 0f..1f
             } else {
-                android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
+                message = "Video ini tidak bisa dibaca."
             }
         }
     }
@@ -3878,7 +3882,7 @@ private fun GifScreen(
             galleryUri = null
             message = null
         } else {
-            android.widget.Toast.makeText(context, "Video sumber tidak lagi bisa diakses (mungkin sudah dihapus/dipindah).", android.widget.Toast.LENGTH_LONG).show()
+            message = "Video sumber tidak lagi bisa diakses (mungkin sudah dihapus/dipindah)."
         }
         onPrefillConsumed()
     }
@@ -4135,7 +4139,7 @@ private fun GifScreen(
                     val savedGalleryUri = galleryUri
                     if (savedGifFile != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareGifFile(context, savedGifFile) }) { Text("Share") }
+                            Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareGifFile(context, savedGifFile) }) { Text("Bagikan") }
                             if (savedGalleryUri != null) {
                                 OutlinedButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); openGifInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
                             }
@@ -4284,7 +4288,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                 sourceAudioBitrateBps = info.audioBitrateBps
                 trimRange = 0f..1f
             } else {
-                android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
+                message = "Video ini tidak bisa dibaca."
             }
         }
     }
@@ -4452,10 +4456,10 @@ private fun CompressorScreen(onBack: () -> Unit) {
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Perkiraan hasil", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(formatFileSize(estimatedNewSizeBytes), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                            Text("~${formatFileSize(estimatedNewSizeBytes)}", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                         }
                         Text(
-                            "Hemat sekitar ${savedPercent.roundToInt()}% — encode H.265, resolusi & kualitas tampilan tetap sama.",
+                            "Hemat sekitar ${savedPercent.roundToInt()}% — encode H.265, resolusi & kualitas tampilan tetap sama. Perkiraan kasar, ukuran hasil akhir bisa sedikit berbeda.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -4591,7 +4595,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                     val savedGalleryUri = galleryUri
                     if (savedFile != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareVideo(context, savedFile) }) { Text("Share") }
+                            Button(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); shareVideo(context, savedFile) }) { Text("Bagikan") }
                             if (savedGalleryUri != null) {
                                 OutlinedButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); openInGallery(context, savedGalleryUri) }) { Text("Buka di Galeri") }
                             }

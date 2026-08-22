@@ -1,5 +1,210 @@
 # Changelog
 
+## Batch 39: Eksekusi Prioritas 4 MICRO_POLISH_GUIDE.md — Kejelasan Estimasi Ukuran File
+
+### CHANGED
+`MainActivity.kt`, `CompressorScreen` — kotak perbandingan "Ukuran asli /
+Perkiraan hasil":
+- Angka "Perkiraan hasil": `formatFileSize(estimatedNewSizeBytes)` →
+  `"~${formatFileSize(estimatedNewSizeBytes)}"` (tambah prefix tilde,
+  pola sama persis dengan estimasi ukuran di ResizerScreen).
+- Caption di bawahnya: `"Hemat sekitar ${savedPercent}% — encode H.265,
+  resolusi & kualitas tampilan tetap sama."` → ditambah kalimat
+  `"Perkiraan kasar, ukuran hasil akhir bisa sedikit berbeda."` di
+  akhirnya.
+
+### AUDIT (3 lokasi ditemukan, hanya 1 butuh fix)
+1. **ResizerScreen** — `"Perkiraan ukuran: ~X (kasar, hasil asli bisa
+   sedikit berbeda)."` — sudah punya tilde + disclaimer eksplisit. Sudah
+   benar → **tidak disentuh**.
+2. **TargetSizeDialog** — `"≈ X kbps untuk durasi klip yang dipilih saat
+   ini."` — sudah pakai simbol ≈ (bitrate, bukan ukuran file langsung,
+   tapi prinsip sama). Sudah benar → **tidak disentuh**.
+3. **CompressorScreen** — kotak "Ukuran asli / Perkiraan hasil": label
+   "Perkiraan hasil" sudah ada, TAPI angkanya sendiri tidak bertanda
+   estimasi (tanpa tilde) dan caption di bawahnya tidak menyebut hasil
+   akhir bisa berbeda — **GAP, difix** (lihat CHANGED di atas).
+
+### VERIFIED
+- Baca ulang `estimateCompressedSizeBytes` di `VideoResizer.kt` — TIDAK
+  disentuh, hanya string display yang berubah, kalkulasi identik 1:1.
+- Brace `{}` / paren `()` balance seluruh file setelah edit: 1096/1096,
+  2175/2175 (naik dari 1095/1095 & 2175/2175 di Batch 38 — bertambah 1
+  brace dari interpolasi `"~${...}"` baru, seimbang & diharapkan).
+- Grep `"Perkiraan hasil"` → hanya 1 kemunculan, sesuai lokasi yang
+  dimaksud, tidak ada duplikasi tak sengaja.
+
+### NOT VERIFIED
+Build Gradle & runtime device (tidak ada environment Android build di
+sandbox ini). Perubahan murni string literal, risiko compile error
+praktis nol.
+
+### UNTOUCHED
+Logika/algoritma `estimateCompressedSizeBytes` & `estimateOutputSizeBytes`
+tidak disentuh sama sekali (sesuai larangan "DILARANG menambah algoritma
+prediksi rumit" — bukan cuma tidak ditambah, memang tidak perlu diubah
+sama sekali karena masalahnya murni presentasi). ResizerScreen &
+TargetSizeDialog tidak disentuh (sudah benar). Semua logika resize/
+compress/export, navigasi, persistence, signing/versioning/CI tidak
+disentuh.
+
+### VERDICT
+Prioritas 4 — COMPLETE.
+
+## Batch 38: Eksekusi Prioritas 3 MICRO_POLISH_GUIDE.md — Action Row Layar Kecil
+
+### CHANGED
+`MainActivity.kt` — Studio history card action row (`StudioScreen`, row
+berisi `Edit ulang` / `Galeri` opsional / `Bagikan` / icon `Hapus`)
+sekarang `Modifier.horizontalScroll(rememberScrollState())`. +1 import
+baru: `androidx.compose.foundation.horizontalScroll`.
+
+### KENAPA
+Row ini ada di dalam `Card` (fillMaxWidth, padding 12dp) → `Row` berisi
+thumbnail 72dp + spacer 12dp → `Column(weight(1f))` yang memuat SEMUA teks
+detail entry DAN action row ini di baris paling bawah. Di layar sempit
+(±360dp), ruang tersisa untuk Column itu hanya sekitar 250dp, sementara 4
+item action row (2 TextButton teks + 1 TextButton + 1 IconButton) butuh
+lebih dari itu → berisiko clipping/terpotong. Row lain yang berisi tombol
+serupa (ResizerScreen, GifScreen, CompressorScreen) hanya 2 item DAN
+punya lebar layar penuh (bukan di dalam Column tersempit thumbnail),
+sehingga tidak diaudit sebagai berisiko dan sengaja tidak disentuh.
+
+### FIX YANG DIPILIH (dan yang TIDAK dipilih)
+`horizontalScroll` dipilih karena: (a) modifier bawaan Compose Foundation
+yang SUDAH dipakai polanya di file ini (`verticalScroll` pada beberapa
+dialog) — bukan abstraksi baru; (b) menjamin nol-clipping di semua lebar
+layar & semua font-scale tanpa perlu logika kondisional; (c) tidak
+mengubah teks/urutan/perilaku tombol sama sekali, hanya menambah
+kemampuan scroll kalau kontennya memang lebih lebar dari ruang tersedia
+(kalau muat, tidak terlihat beda sama sekali). Alternatif yang
+dipertimbangkan tapi TIDAK dipakai: FlowRow (butuh cek versi Compose
+foundation-layout & bisa jadi masih experimental di versi project ini —
+risiko lebih tinggi untuk gain yang sama), mengecilkan padding/spacing
+(rapuh, bisa tetap clip di font-scale besar atau layar sangat sempit).
+
+### VERIFIED
+- Brace `{}` dan paren `()` balance seluruh file dihitung ulang setelah
+  edit: 1095/1095 dan 2175/2175 (sebelum edit juga sama-seimbang) — tidak
+  ada syntax error terjadi dari penyisipan modifier.
+- Baca ulang seluruh isi Row (4 child composable) untuk pastikan tidak
+  ada yang tertinggal/terhapus saat menyisipkan parameter `modifier`.
+- Grep konfirmasi `horizontalScroll` hanya dipakai di 1 tempat yang
+  dimaksud, import baru hanya 1 baris.
+
+### NOT VERIFIED
+Build Gradle & runtime device/emulator (tidak ada environment Android
+build di sandbox ini) — tidak bisa memverifikasi visual scroll behavior
+secara langsung, hanya lewat pembacaan kode & pola yang identik dengan
+`verticalScroll` yang sudah terbukti jalan di dialog lain di file yang
+sama.
+
+### UNTOUCHED
+Tidak ada redesign StudioScreen. Urutan/teks/logika tombol (Edit ulang/
+Galeri/Bagikan/Hapus) sama persis. Row 2-tombol lain (Resizer/Gif/
+Compressor) tidak disentuh. Semua logika resize/compress/export,
+navigasi, persistence, signing/versioning/CI tidak disentuh.
+
+### VERDICT
+Prioritas 3 — COMPLETE.
+
+## Batch 37: Eksekusi Prioritas 2 MICRO_POLISH_GUIDE.md — Presentasi Error
+
+### CHANGED
+`MainActivity.kt` — audit 7 pemakaian Toast, 3 dikonversi ke mekanisme
+inline `message` yang sudah ada di screen terkait:
+- `GifScreen.handlePickedVideo`: Toast "Video ini tidak bisa dibaca." →
+  `message = "Video ini tidak bisa dibaca."`
+- `GifScreen` prefill `LaunchedEffect`: Toast "Video sumber tidak lagi
+  bisa diakses..." → `message = "..."` (teks sama persis, logika sama)
+- `CompressorScreen.handlePickedVideo`: Toast "Video ini tidak bisa
+  dibaca." → `message = "..."`
+
+Ketiganya dipilih karena terjadi di dalam Composable screen yang SUDAH
+punya slot tampilan inline `message?.let { Text(msg, ...) }` dan sudah
+dipakai untuk pesan lain di screen yang sama (mis. "Dibatalkan.", "Gagal
+membuat GIF: ..."), jadi ini konsistensi dengan pola yang sudah ada, bukan
+infrastruktur baru.
+
+### NOT CHANGED (dipertahankan sengaja, dengan alasan)
+4 Toast di util function `openInGallery`, `shareVideo`, `shareGifFile`,
+`openGifInGallery` TETAP Toast. Alasan: fungsi-fungsi ini menerima
+`context: Context` polos dan dipanggil dari 4 screen berbeda (Studio,
+Resizer, Gif, Compressor) — tidak ada state `message` yang bisa mereka
+tulisi tanpa menambah parameter callback baru ke tiap pemanggil, yang
+berarti abstraksi/plumbing baru. Panduan eksplisit melarang membangun
+framework error baru dan mengizinkan Toast tetap dipakai "where it is
+genuinely appropriate" — kasus ini masuk kategori itu.
+
+### VERIFIED
+- `grep -n "Toast"` → tersisa persis 4, semua di 4 util function yang
+  memang dipertahankan sengaja (bukan residual tak sengaja).
+- `grep -n 'message = "'` → 3 assignment baru muncul persis di tempat
+  yang dimaksud, tidak ada baris yang masih punya Toast+message berbarengan
+  (no duplicate messaging).
+- Read-through: `message = null` reset di awal `handlePickedVideo` &
+  prefill effect kedua screen tidak berubah — behavior "pesan lama hilang
+  begitu user pilih video baru" tetap sama.
+
+### NOT VERIFIED
+Build Gradle & runtime device (tidak ada environment Android build di
+sandbox ini). Perubahan sintaksis sederhana (1 baris Toast-call diganti 1
+baris assignment ke var String? yang sudah dideklarasikan di scope yang
+sama), risiko compile error praktis nol.
+
+### UNTOUCHED
+Semua logika resize/compress/export, navigasi, persistence, layout,
+signing/versioning/CI — tidak disentuh. 4 Toast lain, styling `message`
+Text (warna/urutan), dan pesan-pesan `message` lain yang sudah ada
+(Dibatalkan/Gagal) tidak diubah.
+
+### VERDICT
+Prioritas 2 — COMPLETE.
+
+## Batch 36: Eksekusi Prioritas 1 MICRO_POLISH_GUIDE.md — Konsistensi Bahasa UI
+
+### CHANGED
+`MainActivity.kt` — 17 string literal UI berbahasa Inggris diganti ke
+Bahasa Indonesia (bahasa UI utama proyek):
+- "Share" → "Bagikan" (4 lokasi: tombol Studio action row, tombol hasil
+  Compressor, tombol hasil GifScreen, tombol hasil ResizerScreen)
+- "Batch Export" → "Ekspor Batch" (judul top bar BatchScreen)
+- "Custom Resolution" → "Resolusi Kustom" (judul dialog)
+- "Custom Bitrate" → "Bitrate Kustom" (judul dialog)
+- "Width" → "Lebar", "Height" → "Tinggi" (label field dialog resolusi)
+- "Save" → "Simpan" (4 lokasi: dialog Resolusi/Bitrate/Target Size/Batch
+  Target Size)
+- "Cancel" → "Batal" (4 lokasi, pasangan tombol Save di atas)
+
+Hanya string literal yang diubah — TIDAK ada rename identifier/fungsi/
+variable Kotlin, TIDAK ada perubahan logika, TIDAK ada perubahan
+navigation route.
+
+### VERIFIED
+- `grep` residual seluruh 8 kata contoh guide (Custom Resolution/Bitrate,
+  Save, Cancel, Share, Width, Height, Batch Export) di MainActivity.kt →
+  nihil, semua tergantikan.
+- `grep` pola umum string Inggris kapital di Text/label/title/
+  contentDescription pada MainActivity.kt, VideoPickerScreen.kt,
+  AppUpdater.kt → nihil residual bermakna (hanya false-positive Indonesia
+  seperti "Tetap di sini", "Tidak valid", "Edit ulang").
+- Static read-through tiap call site yang diubah (17 lokasi) untuk
+  memastikan tidak ada string lain di baris yang sama ikut tersentuh.
+
+### NOT VERIFIED
+- Build Gradle aktual & runtime device (tidak ada environment Android
+  build di sandbox ini) — perubahan murni string literal 1:1 sehingga
+  risiko compile error praktis nol, tapi tetap dicatat sesuai
+  verification gate panduan.
+
+### UNTOUCHED
+Seluruh logika resize/compress/export, navigasi, persistence, layout
+(spacing/wrapping), signing/keystore, versioning, CI — tidak disentuh
+sama sekali batch ini.
+
+### VERDICT
+Prioritas 1 — COMPLETE.
+
 ## Batch 35: Tanam MICRO_POLISH_GUIDE.md sebagai standing playbook permanen
 
 Sesuai permintaan user, panduan `VideoResizer_FINAL_MICRO_POLISH_

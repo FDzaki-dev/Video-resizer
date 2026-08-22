@@ -34,13 +34,13 @@ sudah berjalan.
 - Setelah tiap perubahan, cek ulang call site & state flow terdampak.
 - Jika satu item sudah benar di kode saat ini, biarkan (jangan disentuh).
 
-## PRIORITAS 1 — Konsistensi Bahasa UI
+## PRIORITAS 1 — Konsistensi Bahasa UI [DONE — Batch 36]
 Audit string user-facing, samakan bahasa di seluruh app (contoh campuran:
 Custom Resolution, Custom Bitrate, Save, Cancel, Share, Width, Height,
 Batch Export). Pakai bahasa UI utama proyek secara konsisten. DILARANG
 mengubah nama identifier internal hanya untuk ini.
 
-## PRIORITAS 2 — Presentasi Error
+## PRIORITAS 2 — Presentasi Error [DONE — Batch 37]
 Audit error user-facing yang saat ini lewat Toast. Untuk error yang butuh
 aksi/konteks user: utamakan mekanisme Snackbar/inline error yang sudah
 ada. Toast hanya untuk kasus yang memang tepat. Pertahankan logika error
@@ -49,7 +49,7 @@ baru. Syarat: error harus dimengerti, user tahu apa yang gagal, user tahu
 aksi apa (jika ada) yang bisa dilakukan, hindari duplikasi Toast +
 Snackbar.
 
-## PRIORITAS 3 — Action Row Layar Kecil
+## PRIORITAS 3 — Action Row Layar Kecil [DONE — Batch 38]
 Audit action row Studio (Edit again, Gallery, Share, Delete, dan
 sejenisnya). Tujuan: tanpa clipping, tanpa overlap tak sengaja, tanpa
 touch target mikroskopis, tanpa kompresi horizontal paksa di layar
@@ -57,7 +57,7 @@ sempit. Pakai penyesuaian UI lokal terkecil (wrapping/spacing/responsive
 arrangement/adaptive component yang sudah ada). DILARANG mendesain ulang
 seluruh Studio screen.
 
-## PRIORITAS 4 — Kejelasan Estimasi Ukuran File
+## PRIORITAS 4 — Kejelasan Estimasi Ukuran File [DONE — Batch 39]
 Di tempat estimasi ukuran output ditampilkan: beri label jelas sebagai
 estimasi, buat jelas secara visual bahwa ukuran hasil encode final bisa
 berbeda. Pertahankan logika kalkulasi/estimasi yang ada kecuali ada bukti

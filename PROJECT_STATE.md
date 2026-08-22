@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 35**. This is the first-read file per the context
+Snapshot as of **Batch 39**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -62,12 +62,66 @@ Batch 35) sebelum mulai.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. Eksekusi **MICRO_POLISH_GUIDE.md Prioritas 1** (Konsistensi Bahasa UI)
-   — mulai dari sini, satu prioritas per micro-batch (maks 3 file/task).
-2. Prioritas 2 (Presentasi Error) — setelah Prioritas 1 selesai & verified.
-3. Prioritas 3–8 menyusul berurutan, lihat MICRO_POLISH_GUIDE.md untuk detail.
+1. Eksekusi **MICRO_POLISH_GUIDE.md Prioritas 5** (Lifecycle Filmstrip/
+   Frame Extraction) — satu prioritas per micro-batch (maks 3 file/task).
+2. Prioritas 6–8 menyusul berurutan, lihat MICRO_POLISH_GUIDE.md untuk detail.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 39** — Eksekusi MICRO_POLISH_GUIDE.md **Prioritas 4** (Kejelasan
+  Estimasi Ukuran File) [DONE]. Audit 3 tempat yang menampilkan estimasi
+  ukuran/bitrate: (1) ResizerScreen "Perkiraan ukuran: ~X (kasar, hasil
+  asli bisa sedikit berbeda)" — SUDAH benar, tidak disentuh; (2)
+  TargetSizeDialog "≈ X kbps..." — SUDAH pakai simbol ≈, tidak disentuh;
+  (3) **CompressorScreen** kotak "Ukuran asli / Perkiraan hasil" — GAP
+  ditemukan: angka hasil tidak ada tilde/prefix estimasi & caption di
+  bawahnya tidak menyebut hasil akhir bisa berbeda. Fix: angka jadi
+  `"~${formatFileSize(...)}"` (konsisten pola ResizerScreen) + caption
+  "Hemat sekitar X%..." ditambah kalimat "Perkiraan kasar, ukuran hasil
+  akhir bisa sedikit berbeda." Logika `estimateCompressedSizeBytes` /
+  `estimateOutputSizeBytes` TIDAK disentuh sama sekali — murni teks
+  tampilan. File diubah: MainActivity.kt saja (1 lokasi, 2 baris teks).
+  Brace/paren balance: 1096/1096, 2175/2175.
+- **Batch 38** — Eksekusi MICRO_POLISH_GUIDE.md **Prioritas 3** (Action Row
+  Layar Kecil) [DONE]. Studio history card action row (`Edit ulang` /
+  `Galeri` opsional / `Bagikan` / icon Hapus) ada di dalam Column dengan
+  lebar sisa sempit (Card 12dp padding + thumbnail 72dp + spacer 12dp
+  memakan ruang sebelum row ini) — 4 item sekaligus berisiko clipping di
+  layar sempit. Fix: tambah `Modifier.horizontalScroll(rememberScrollState())`
+  ke Row tsb (+import `androidx.compose.foundation.horizontalScroll`,
+  pola sama seperti `verticalScroll` yang sudah dipakai di dialog lain).
+  Row lain yang diaudit (ResizerScreen "Buka di Galeri"+"Bagikan" 2-tombol,
+  GifScreen/CompressorScreen "Bagikan"+"Buka di Galeri" 2-tombol) dibiarkan
+  — full screen-width, hanya 2 item, tidak ada risiko clipping nyata,
+  sesuai "if already correct, leave untouched". Tidak ada redesign Studio
+  screen. File diubah: MainActivity.kt saja (2 lokasi: 1 import + 1 Row).
+  Brace/paren balance whole-file diverifikasi ({}=1095/1095, ()=2175/2175).
+- **Batch 37** — Eksekusi MICRO_POLISH_GUIDE.md **Prioritas 2** (Presentasi
+  Error) [DONE]. 3 dari 7 Toast di `MainActivity.kt` dikonversi ke
+  mekanisme inline `message` yang SUDAH ADA di GifScreen & CompressorScreen
+  (bukan framework baru): GifScreen.handlePickedVideo + prefill effect (2
+  lokasi), CompressorScreen.handlePickedVideo (1 lokasi) — semua kasus
+  "video tidak bisa dibaca/diakses" saat memuat video, sekarang tampil
+  sebagai Text inline di layar (sudah ada slot `message?.let {...}` di
+  kedua screen), bukan Toast sekali-lewat. 4 Toast SISANYA (openInGallery,
+  shareVideo, shareGifFile, openGifInGallery — semua util function lintas-
+  layar tanpa state `message` di scope-nya, dipanggil dari Studio/Resizer/
+  Gif/Compressor) SENGAJA dipertahankan sebagai Toast — genuinely
+  appropriate per panduan, karena mengonversinya butuh plumbing
+  state/callback baru lintas 4 pemanggil (melanggar "no new framework/
+  abstraction"). Tidak ada duplikasi Toast+message pada kasus manapun.
+  File diubah: MainActivity.kt saja.
+- **Batch 36** — Eksekusi MICRO_POLISH_GUIDE.md **Prioritas 1** (Konsistensi
+  Bahasa UI) [DONE]. 17 string Inggris di `MainActivity.kt` diganti ke
+  Bahasa Indonesia (bahasa UI utama proyek, sudah dominan >95% string):
+  "Share"→"Bagikan" (×4), "Batch Export"→"Ekspor Batch", "Custom
+  Resolution"→"Resolusi Kustom", "Custom Bitrate"→"Bitrate Kustom",
+  "Width"→"Lebar", "Height"→"Tinggi", "Save"→"Simpan" (×4), "Cancel"→
+  "Batal" (×4). Hanya string literal UI yang diubah — tidak ada
+  identifier/fungsi/variable yang di-rename (sesuai aturan panduan).
+  Diverifikasi: grep residual string Inggris di semua Text/label/title/
+  contentDescription MainActivity.kt + VideoPickerScreen.kt +
+  AppUpdater.kt = nihil. Logika/behavior/navigasi tidak tersentuh — hanya
+  literal string. File diubah: MainActivity.kt saja.
 - **Batch 35** — Tanam `MICRO_POLISH_GUIDE.md` sebagai standing playbook
   permanen (sumber: upload user `VideoResizer_FINAL_MICRO_POLISH_
   ClaudeOnly.md`). TIDAK ada perubahan kode/logika sama sekali batch ini
