@@ -58,6 +58,16 @@ architecture/quirk notes live in README.md.
    Strict Micro-Batching Rule (menghindari ZIP terpotong).
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 25** — User request: fold every top-bar feature except Studio
+  into the "More" overflow menu. `Compress`/`Batch export`/`Video ke GIF`
+  IconButtons removed from `ResizerScreen`'s `TopAppBar` `actions` and
+  re-added as `DropdownMenuItem`s at the top of the existing `showMoreMenu`
+  `DropdownMenu` (above the "Cek update" divider, in Compress→Batch→GIF
+  order), calling the same `onOpenCompressor`/`onOpenBatch`/`onOpenGif`
+  lambdas. Studio (`onOpenStudio`) intentionally left as the sole
+  standalone icon per explicit instruction. Top bar is now just
+  `[Studio, More]` (2 icons) — title has more room than at any point since
+  Batch 20. 1 file touched (`MainActivity.kt`), within cap.
 - **Batch 24** — Follow-up fix on Batch 23's title-truncation fix (user:
   "distorsi sih nggak, tapi gak gini juga kalik" — no longer garbled, but
   "Vi…" was still unacceptable). Root cause was the bar carrying 6 action

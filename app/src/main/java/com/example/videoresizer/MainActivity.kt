@@ -839,26 +839,14 @@ private fun ResizerScreen(
                     }
                 },
                 actions = {
-                    // BUG FIX (Batch 24): Batch 21's standalone update
-                    // button pushed the bar from 5 action icons to 6,
-                    // which is what forced Batch 23's maxLines=1+Ellipsis
-                    // fix to truncate the title down to "Vi…" — not
-                    // distorted anymore, but not acceptable either per
-                    // user feedback. Real fix: fold Update + Theme (both
-                    // "settings-like", not core editing actions) into one
-                    // "More" overflow menu, restoring the original 5-icon
-                    // width (4 core features + 1 more) the title had
-                    // before Batch 21 — so "Video Resizer" fits without
-                    // truncation on typical screen widths again.
-                    IconButton(onClick = onOpenCompressor) {
-                        Icon(Icons.Filled.Compress, contentDescription = "Kompres video")
-                    }
-                    IconButton(onClick = onOpenBatch) {
-                        Icon(Icons.Filled.Layers, contentDescription = "Batch export")
-                    }
-                    IconButton(onClick = onOpenGif) {
-                        Icon(Icons.Filled.Gif, contentDescription = "Video ke GIF")
-                    }
+                    // BATCH 25: user asked to fold every feature except
+                    // Studio into "More" (Compress/Batch/GIF were separate
+                    // icons since before Batch 21; keeping them there was
+                    // the whole reason the bar got crowded in the first
+                    // place). Studio stays standalone per explicit request.
+                    // Bar is now just [Studio, More] — 2 icons, title has
+                    // maximum room, and every other feature lives in one
+                    // dropdown instead of being split across bar+menu.
                     IconButton(onClick = onOpenStudio) {
                         Icon(Icons.Filled.PhotoLibrary, contentDescription = "Studio")
                     }
@@ -871,6 +859,22 @@ private fun ResizerScreen(
                             }
                         }
                         DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Kompres video") },
+                                leadingIcon = { Icon(Icons.Filled.Compress, contentDescription = null) },
+                                onClick = { showMoreMenu = false; onOpenCompressor() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Batch export") },
+                                leadingIcon = { Icon(Icons.Filled.Layers, contentDescription = null) },
+                                onClick = { showMoreMenu = false; onOpenBatch() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Video ke GIF") },
+                                leadingIcon = { Icon(Icons.Filled.Gif, contentDescription = null) },
+                                onClick = { showMoreMenu = false; onOpenGif() }
+                            )
+                            androidx.compose.material3.HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text(if (checkingUpdate) "Mengecek update…" else "Cek update") },
                                 leadingIcon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
