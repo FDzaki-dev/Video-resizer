@@ -4323,14 +4323,47 @@ private fun CompressorScreen(onBack: () -> Unit) {
         (sourceSizeBytes * (clipDurationMs.toDouble() / durationMs.toDouble())).toLong()
     } else 0L
 
+    // Batch 34: factored out so the "Batalkan" button (during progress),
+    // the confirm dialog's own button, and nothing else duplicate this —
+    // exact same real-cancel logic Batch 31 fixed (Transformer.cancel() +
+    // ExportForegroundService.stop(), not just resetting UI state).
+    fun cancelCompress() {
+        activeTransformer?.cancel()
+        activeTransformer = null
+        ExportForegroundService.stop(context)
+        isProcessing = false
+        message = "Dibatalkan."
+    }
+
+    // UX FIX (Batch 34, Pending Queue item): previously back (both the
+    // toolbar arrow and the system gesture/button) silently cancelled and
+    // exited mid-export with zero warning — same gap ResizerScreen already
+    // closed for itself via showExitWhileProcessingConfirm (baris ~648).
+    // Only asks when isProcessing; back when idle behaves exactly as
+    // before (immediate onBack(), no dialog).
+    var showExitWhileProcessingConfirm by remember { mutableStateOf(false) }
+
     // Same BackHandler reasoning as every other manual-state screen here.
     androidx.activity.compose.BackHandler(enabled = true) {
-        if (isProcessing) {
-            activeTransformer?.cancel()
-            activeTransformer = null
-            ExportForegroundService.stop(context)
-        }
-        onBack()
+        if (isProcessing) showExitWhileProcessingConfirm = true else onBack()
+    }
+    if (showExitWhileProcessingConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitWhileProcessingConfirm = false },
+            title = { Text("Batalkan proses?") },
+            text = { Text("Video sedang dikompres. Keluar sekarang akan menghentikan dan membatalkan proses ini.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showExitWhileProcessingConfirm = false
+                    cancelCompress()
+                    onBack()
+                }) { Text("Batalkan proses", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); showExitWhileProcessingConfirm = false }) { Text("Tetap di sini") }
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -4339,7 +4372,10 @@ private fun CompressorScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Kompres Video") },
                 navigationIcon = {
-                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onBack() }) {
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        if (isProcessing) showExitWhileProcessingConfirm = true else onBack()
+                    }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Kembali")
                     }
                 },
@@ -4440,11 +4476,7 @@ private fun CompressorScreen(onBack: () -> Unit) {
                             Text("Mengompres… $progress%", color = MaterialTheme.colorScheme.onBackground)
                             OutlinedButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                activeTransformer?.cancel()
-                                activeTransformer = null
-                                ExportForegroundService.stop(context)
-                                isProcessing = false
-                                message = "Dibatalkan."
+                                cancelCompress()
                             }) { Text("Batalkan") }
                         }
                     }

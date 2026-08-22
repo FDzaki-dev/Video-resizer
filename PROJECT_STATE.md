@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 33**. This is the first-read file per the context
+Snapshot as of **Batch 34**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -53,12 +53,19 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **[LOW] "Batalkan" di CompressorScreen belum ada dialog konfirmasi
-   back-saat-proses** seperti `showExitWhileProcessingConfirm` di
-   ResizerScreen (baris ~648). Bagian krusial (Transformer benar-benar
-   berhenti) sudah fix Batch 31; ini murni UX nice-to-have.
+_Kosong — audit sektor kompresi video (Batch 31) tuntas, semua temuan (3 fungsional + 1 UX) sudah dikerjakan Batch 31-34._
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 34** — Penutup audit kompresi video: fix item Pending Queue
+  terakhir (dialog konfirmasi back-saat-proses). `CompressorScreen`
+  sekarang punya `showExitWhileProcessingConfirm` sama persis pola
+  ResizerScreen (baris ~648): back (toolbar arrow ATAU system gesture)
+  saat `isProcessing` menampilkan `AlertDialog` dulu ("Batalkan proses?"),
+  bukan langsung keluar diam-diam. Logika cancel-sungguhan (Batch 31)
+  difaktor ke `cancelCompress()`, dipakai bareng oleh tombol "Batalkan"
+  progress bar & tombol dialog. Back saat idle tidak berubah (langsung
+  onBack(), tanpa dialog). File diubah: MainActivity.kt saja. Pending
+  Queue kosong — audit sektor kompresi video (Batch 31) tuntas 100%.
 - **Batch 33** — Lanjutan audit kompresi video: fix Pending Queue #1
   (estimasi audio flat 128kbps). `CompressorScreen` sekarang probe
   keberadaan & bitrate track audio asli lewat `MediaExtractor` (loop yang

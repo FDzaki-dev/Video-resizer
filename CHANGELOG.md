@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 34: Dialog konfirmasi back-saat-proses di CompressorScreen (penutup audit kompresi video)
+
+Item terakhir Pending Queue dari audit Batch 31. `CompressorScreen`
+sebelumnya membiarkan back (baik tombol panah toolbar maupun gesture/
+tombol back sistem) langsung membatalkan proses & keluar tanpa
+peringatan sama sekali — beda dari ResizerScreen yang sudah punya dialog
+konfirmasi (`showExitWhileProcessingConfirm`, baris ~648) untuk kasus
+yang sama persis.
+
+**Fix:**
+- Logika cancel-sungguhan (`activeTransformer?.cancel()` +
+  `ExportForegroundService.stop()`, hasil fix Batch 31) difaktor jadi
+  fungsi `cancelCompress()` — dipakai tombol "Batalkan" di progress bar
+  DAN tombol "Batalkan proses" di dialog baru, tidak ada logika
+  terduplikasi.
+- Toolbar back-arrow & `BackHandler` sistem: kalau `isProcessing`, tampilkan
+  `AlertDialog` ("Batalkan proses?" / "Video sedang dikompres. Keluar
+  sekarang akan menghentikan dan membatalkan proses ini.") dengan pilihan
+  "Batalkan proses" (merah, benar-benar cancel + keluar) atau "Tetap di
+  sini" (dismiss, lanjut proses). Kalau tidak sedang proses, back tetap
+  langsung `onBack()` seperti sebelumnya — tidak ada perubahan perilaku
+  untuk kasus idle.
+
+File diubah: `MainActivity.kt` saja. **Pending Queue sekarang kosong** —
+audit sektor kompresi video yang diminta user di Batch 31 tuntas: 2
+temuan HIGH (Transformer.cancel() sungguhan, foreground service), 2
+temuan MEDIUM/LOW (fps asli, audio bitrate asli), 1 item UX (dialog
+konfirmasi ini) — semuanya sudah diperbaiki lintas Batch 31-34.
+
 ## Batch 33: Fix estimasi audio flat 128kbps — probe audio track asli source
 
 Lanjutan audit kompresi video (Batch 31 Pending Queue). Cap "jangan
