@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — Video Resizer
 
-Snapshot as of **Batch 32**. This is the first-read file per the context
+Snapshot as of **Batch 33**. This is the first-read file per the context
 hierarchy (Chat Saat Ini > this file > FILE_MANIFEST.txt > CHANGELOG.md >
 README.md) — update it at the end of every batch rather than making it
 stale. Full detail for anything summarized here lives in CHANGELOG.md;
@@ -53,17 +53,26 @@ architecture/quirk notes live in README.md.
   Deliberately not bumped further — see "Defaults a new reader should know".
 
 ## Pending Queue (not done this batch — do next, in this order)
-1. **[LOW] `estimateSourceBitrateBps` asumsi flat 128kbps audio.**
-   (VideoResizer.kt, dipakai `computeCompressTargetBitrateBps` sbg cap
-   85%.) Source tanpa audio track sama sekali (tapi `muteAudio=false`
-   diminta) akan salah dikurangi 128kbps dari estimasi bitrate video,
-   sedikit memperketat cap tanpa perlu. Edge case, dampak kecil.
-2. **[LOW] "Batalkan" di CompressorScreen belum ada dialog konfirmasi
+1. **[LOW] "Batalkan" di CompressorScreen belum ada dialog konfirmasi
    back-saat-proses** seperti `showExitWhileProcessingConfirm` di
    ResizerScreen (baris ~648). Bagian krusial (Transformer benar-benar
    berhenti) sudah fix Batch 31; ini murni UX nice-to-have.
 
 ## Batch history (newest first — full detail in CHANGELOG.md)
+- **Batch 33** — Lanjutan audit kompresi video: fix Pending Queue #1
+  (estimasi audio flat 128kbps). `CompressorScreen` sekarang probe
+  keberadaan & bitrate track audio asli lewat `MediaExtractor` (loop yang
+  sama dgn probe fps Batch 32) — `CompressRequest.sourceHasAudio`/
+  `sourceAudioBitrateBps` baru. Source tanpa audio track kini benar
+  dikurangi 0 (bukan 128kbps) saat menghitung cap 85% bitrate sumber;
+  source dgn audio bitrate tinggi/rendah dari 128kbps kini pakai nilai
+  aslinya. `estimateSourceBitrateBps` & `estimateCompressedSizeBytes`
+  (VideoResizer.kt) sama-sama diupdate, keduanya tetap fallback ke
+  128kbps kalau probe gagal (perilaku lama, tidak berubah utk kasus itu).
+  File diubah: MainActivity.kt, VideoResizer.kt. Pending Queue tersisa:
+  dialog konfirmasi back-saat-proses (LOW, UX nice-to-have) — audit
+  sektor kompresi video sekarang tuntas untuk semua temuan fungsional
+  yang ditemukan Batch 31.
 - **Batch 32** — Lanjutan audit kompresi video: fix Pending Queue #1
   (`ASSUMED_FPS=30` hardcoded). `CompressorScreen` sekarang probe fps asli
   source via `MediaExtractor` + `MediaFormat.KEY_FRAME_RATE` (bukan

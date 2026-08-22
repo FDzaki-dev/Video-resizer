@@ -4158,8 +4158,8 @@ private fun GifScreen(
     }
 }
 
-/** Metadata probed for the picked source video: duration/dimensions (same as every other screen) plus its file size in bytes and real fps, needed only here to estimate/cap the compressed output size. */
-private data class CompressSourceInfo(val durationMs: Long, val width: Int, val height: Int, val sizeBytes: Long, val fps: Int)
+/** Metadata probed for the picked source video: duration/dimensions (same as every other screen) plus its file size in bytes, real fps, and audio-track presence/bitrate (Batch 33), needed only here to estimate/cap the compressed output size. */
+private data class CompressSourceInfo(val durationMs: Long, val width: Int, val height: Int, val sizeBytes: Long, val fps: Int, val hasAudio: Boolean, val audioBitrateBps: Int)
 
 /**
  * Compressor tab: re-encodes a whole video (optionally trimmed) as H.265 at
@@ -4185,6 +4185,8 @@ private fun CompressorScreen(onBack: () -> Unit) {
     var sourceHeight by remember { mutableIntStateOf(0) }
     var sourceSizeBytes by remember { mutableLongStateOf(0L) }
     var sourceFps by remember { mutableIntStateOf(0) }
+    var sourceHasAudio by remember { mutableStateOf(true) }
+    var sourceAudioBitrateBps by remember { mutableIntStateOf(0) }
     var trimRange by remember { mutableStateOf(0f..1f) }
     var filmstrip by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     var level by remember { mutableStateOf(CompressionLevel.RECOMMENDED) }
@@ -4224,25 +4226,37 @@ private fun CompressorScreen(onBack: () -> Unit) {
             }.getOrNull() ?: -1L
             // 0 = "couldn't probe" — computeCompressTargetBitrateBps /
             // estimateCompressedSizeBytes both fall back to ASSUMED_FPS.
-            val fps = runCatching {
+            // Same MediaExtractor pass also checks for an audio track
+            // (Batch 33) — hasAudio defaults to true (old assumed-present
+            // behavior) only if the probe itself fails; a probe that
+            // succeeds but finds zero audio tracks correctly reports false.
+            var fps = 0
+            var hasAudio = true
+            var audioBitrateBps = 0
+            val probed = runCatching {
                 val extractor = android.media.MediaExtractor()
                 try {
                     extractor.setDataSource(context, uri, null)
-                    var result = 0
+                    var foundAudio = false
                     for (i in 0 until extractor.trackCount) {
                         val format = extractor.getTrackFormat(i)
                         val mime = format.getString(android.media.MediaFormat.KEY_MIME) ?: continue
                         if (mime.startsWith("video/") && format.containsKey(android.media.MediaFormat.KEY_FRAME_RATE)) {
-                            result = format.getInteger(android.media.MediaFormat.KEY_FRAME_RATE)
-                            break
+                            fps = format.getInteger(android.media.MediaFormat.KEY_FRAME_RATE)
+                        } else if (mime.startsWith("audio/")) {
+                            foundAudio = true
+                            if (format.containsKey(android.media.MediaFormat.KEY_BIT_RATE)) {
+                                audioBitrateBps = format.getInteger(android.media.MediaFormat.KEY_BIT_RATE)
+                            }
                         }
                     }
-                    result
+                    foundAudio
                 } finally {
                     extractor.release()
                 }
-            }.getOrNull() ?: 0
-            if (d > 0 && size > 0) CompressSourceInfo(d, w, h, size, fps) else null
+            }
+            probed.onSuccess { hasAudio = it }
+            if (d > 0 && size > 0) CompressSourceInfo(d, w, h, size, fps, hasAudio, audioBitrateBps) else null
         } catch (e: Exception) {
             null
         } finally {
@@ -4266,6 +4280,8 @@ private fun CompressorScreen(onBack: () -> Unit) {
                 sourceHeight = info.height
                 sourceSizeBytes = info.sizeBytes
                 sourceFps = info.fps
+                sourceHasAudio = info.hasAudio
+                sourceAudioBitrateBps = info.audioBitrateBps
                 trimRange = 0f..1f
             } else {
                 android.widget.Toast.makeText(context, "Video ini tidak bisa dibaca.", android.widget.Toast.LENGTH_LONG).show()
@@ -4294,7 +4310,9 @@ private fun CompressorScreen(onBack: () -> Unit) {
             clipDurationMs = clipDurationMs,
             muteAudio = false,
             level = level,
-            sourceFps = sourceFps
+            sourceFps = sourceFps,
+            sourceHasAudio = sourceHasAudio,
+            sourceAudioBitrateBps = sourceAudioBitrateBps
         )
     } else null
     // Same reasoning as source size: proportional slice of the whole
@@ -4450,6 +4468,8 @@ private fun CompressorScreen(onBack: () -> Unit) {
                                 sourceDurationMs = durationMs,
                                 sourceFileSizeBytes = sourceSizeBytes,
                                 sourceFps = sourceFps,
+                                sourceHasAudio = sourceHasAudio,
+                                sourceAudioBitrateBps = sourceAudioBitrateBps,
                                 trimStartMs = startMs,
                                 trimEndMs = endMs,
                                 level = level

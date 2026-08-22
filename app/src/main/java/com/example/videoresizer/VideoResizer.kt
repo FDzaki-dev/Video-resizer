@@ -219,6 +219,22 @@ data class CompressRequest(
      * unconditional behavior.
      */
     val sourceFps: Int = 0,
+    /**
+     * Whether the source has an audio track at all (Batch 33), probed by
+     * [MainActivity]'s CompressorScreen via `MediaExtractor`. Defaults to
+     * `true` (old assumed-audio-present behavior) so a caller that hasn't
+     * been updated to probe this still behaves exactly as before.
+     */
+    val sourceHasAudio: Boolean = true,
+    /**
+     * Source's real audio bitrate in bits/sec (Batch 33), probed via
+     * `MediaFormat.KEY_BIT_RATE` on the audio track if present. 0 or
+     * negative means "couldn't be probed" — [estimateSourceBitrateBps]
+     * falls back to the old flat 128kbps assumption in that case (only
+     * when [sourceHasAudio] is true; a source with no audio track at all
+     * correctly gets 0 regardless of this field).
+     */
+    val sourceAudioBitrateBps: Int = 0,
     val trimStartMs: Long = 0L,
     val trimEndMs: Long = 0L,
     val muteAudio: Boolean = false,
@@ -670,15 +686,23 @@ class VideoResizer(private val context: Context) {
 
     /**
      * Rough estimate of the *source* file's own video bitrate (bits/sec),
-     * from its total file size and duration minus an assumed 128kbps AAC
-     * audio track. Not exact (container overhead/VBR variance ignored) —
-     * it only needs to be good enough for a one-sided safety cap, not a
-     * precise figure.
+     * from its total file size and duration minus its audio track's
+     * bitrate (Batch 33 — real probed value via [CompressRequest.sourceHasAudio]/
+     * [CompressRequest.sourceAudioBitrateBps] when available; a source
+     * with no audio track at all correctly subtracts 0 instead of the old
+     * flat 128kbps assumption, which used to over-tighten the cap on
+     * silent/audio-less sources). Not exact (container overhead/VBR
+     * variance ignored) — it only needs to be good enough for a one-sided
+     * safety cap, not a precise figure.
      */
     private fun estimateSourceBitrateBps(request: CompressRequest): Long? {
         if (request.sourceDurationMs <= 0 || request.sourceFileSizeBytes <= 0) return null
         val totalBps = (request.sourceFileSizeBytes * 8.0) / (request.sourceDurationMs / 1000.0)
-        val audioBps = if (request.muteAudio) 0.0 else 128_000.0
+        val audioBps = when {
+            request.muteAudio || !request.sourceHasAudio -> 0.0
+            request.sourceAudioBitrateBps > 0 -> request.sourceAudioBitrateBps.toDouble()
+            else -> 128_000.0
+        }
         return (totalBps - audioBps).toLong().coerceAtLeast(0L).takeIf { it > 0 }
     }
 
@@ -817,7 +841,11 @@ class VideoResizer(private val context: Context) {
             muteAudio: Boolean,
             level: CompressionLevel,
             /** Real source fps (Batch 32) — see [CompressRequest.sourceFps]; 0/negative falls back to [CompressionLevel.ASSUMED_FPS], same as [computeCompressTargetBitrateBps]. */
-            sourceFps: Int = 0
+            sourceFps: Int = 0,
+            /** See [CompressRequest.sourceHasAudio] (Batch 33). */
+            sourceHasAudio: Boolean = true,
+            /** See [CompressRequest.sourceAudioBitrateBps] (Batch 33). 0/negative falls back to 128kbps, only when [sourceHasAudio] is true. */
+            sourceAudioBitrateBps: Int = 0
         ): Long? {
             if (clipDurationMs <= 0) return null
             val w = if (sourceWidth % 2 != 0) sourceWidth + 1 else sourceWidth
@@ -825,7 +853,11 @@ class VideoResizer(private val context: Context) {
             if (w <= 0 || h <= 0) return null
             val fps = if (sourceFps > 0) sourceFps else CompressionLevel.ASSUMED_FPS
             val levelTargetBps = (w.toDouble() * h.toDouble() * fps * level.targetBitsPerPixelPerFrame)
-            val audioBps = if (muteAudio) 0.0 else 128_000.0
+            val audioBps = when {
+                muteAudio || !sourceHasAudio -> 0.0
+                sourceAudioBitrateBps > 0 -> sourceAudioBitrateBps.toDouble()
+                else -> 128_000.0
+            }
             val sourceVideoBps = if (sourceDurationMs > 0 && sourceFileSizeBytes > 0) {
                 (((sourceFileSizeBytes * 8.0) / (sourceDurationMs / 1000.0)) - audioBps).coerceAtLeast(0.0)
             } else null

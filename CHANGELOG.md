@@ -1,5 +1,34 @@
 # Changelog
 
+## Batch 33: Fix estimasi audio flat 128kbps — probe audio track asli source
+
+Lanjutan audit kompresi video (Batch 31 Pending Queue). Cap "jangan
+re-encode di atas bitrate sumber" (85% dari estimasi bitrate video
+sumber) dan preview before/after di UI selama ini asumsi flat 128kbps
+AAC audio track pada SETIAP source, apapun kenyataannya. Source tanpa
+audio track sama sekali (mis. hasil rekam layar tanpa suara) jadinya
+salah dikurangi 128kbps dari estimasi bitrate video — memperketat cap
+tanpa alasan, bikin hasil kompres sedikit lebih agresif dari seharusnya.
+
+**Fix:**
+- `CompressorScreen.loadSourceInfo()` — MediaExtractor pass yang sama
+  dipakai Batch 32 untuk probe fps sekarang juga cek track audio: ada/
+  tidaknya, dan `MediaFormat.KEY_BIT_RATE`-nya kalau tersedia.
+- `CompressRequest` dapat 2 field baru: `sourceHasAudio: Boolean = true`,
+  `sourceAudioBitrateBps: Int = 0`. Default `true`/`0` menjaga kompatibilitas
+  — pemanggil lama tanpa field ini tetap dapat perilaku persis seperti
+  sebelumnya (asumsi ada audio, fallback 128kbps).
+- `estimateSourceBitrateBps` (VideoResizer.kt, dipakai saat export
+  sungguhan) & `estimateCompressedSizeBytes` (dipakai preview UI) sama-sama
+  diupdate: `!hasAudio → 0 bps`, `hasAudio & bitrate diketahui → pakai
+  nilai asli`, `hasAudio tapi bitrate gak kebaca → fallback 128kbps` (sama
+  seperti perilaku lama).
+
+File diubah: `MainActivity.kt`, `VideoResizer.kt`. Pending Queue tersisa
+hanya 1 item LOW (dialog konfirmasi back-saat-proses, UX nice-to-have) —
+audit sektor kompresi video (Batch 31) tuntas untuk semua temuan
+fungsional.
+
 ## Batch 32: Fix ASSUMED_FPS hardcoded — probe fps asli source utk target bitrate kompresi
 
 Lanjutan audit kompresi video (Batch 31 Pending Queue #1). Formula target
